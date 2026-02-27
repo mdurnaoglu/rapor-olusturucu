@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rapor Oluşturucu</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <div class="lang-switch">
+          <label for="languageSelect" data-i18n="language_label">Dil</label>
+          <select id="languageSelect">
+            <option value="tr">Türkçe</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+        <h1 data-i18n="hero_title">Ajans Rapor Oluşturucu</h1>
+        <p data-i18n="hero_subtitle">Standart cümle şablonları + değişken alanlar ile profesyonel PDF çıktısı.</p>
+      </header>
+
+      <section class="workspace">
+        <div class="builder-pane">
+          <section class="wizard" id="wizard">
+            <div class="steps">
+              <button class="step active" data-step="1" data-i18n="step_structure">Rapor Yapısı</button>
+              <button class="step" data-step="2" data-i18n="step_theme">Tema ve Marka</button>
+              <button class="step" data-step="3" data-i18n="step_data">Veri ve İçerik</button>
+            </div>
+
+            <form id="reportForm" novalidate>
+              <div class="step-panel active" data-step="1">
+                <h2 data-i18n="panel_create_title">Nasıl bir rapor oluşturmak istiyorsun?</h2>
+                <div class="grid two">
+                  <label>
+                    <span class="field-label"><span data-i18n="report_type">Rapor Tipi</span> <span class="meta-required" aria-hidden="true">*</span></span>
+                    <select name="report_type" required>
+                      <option value="meta_performance" data-i18n="report_type_meta">Meta Reklam Performans Raporu</option>
+                      <option value="custom_performance" data-i18n="report_type_custom">Özel Performans Raporu</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="report_title">Rapor Başlığı</span> <span class="meta-required" aria-hidden="true">*</span></span>
+                    <input type="text" name="report_title" value="Meta Reklam Performans Raporu" required />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="start_date">Başlangıç Tarihi</span> <span class="meta-required" aria-hidden="true">*</span></span>
+                    <input type="date" name="report_start_date" required />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="end_date">Bitiş Tarihi</span> <span class="meta-required" aria-hidden="true">*</span></span>
+                    <input type="date" name="report_end_date" required />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="client_name">Müşteri Adı</span> <span class="meta-required" aria-hidden="true">*</span></span>
+                    <input type="text" name="client_name" placeholder="Rally Active" required />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="agency_name">Ajans Adı</span> <span class="meta-required" aria-hidden="true">*</span></span>
+                    <input type="text" name="agency_name" placeholder="Ajans Adı" required />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="agency_logo">Ajans Logosu</span> <span class="meta-optional" data-i18n="optional">(Opsiyonel)</span></span>
+                    <input type="file" name="agency_logo" accept="image/*" />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="client_logo">Müşteri Logosu</span> <span class="meta-optional" data-i18n="optional">(Opsiyonel)</span></span>
+                    <input type="file" name="client_logo" accept="image/*" />
+                  </label>
+                </div>
+              </div>
+
+              <div class="step-panel" data-step="2">
+                <h2 data-i18n="panel_theme_title">Tema ve Marka Ayarları</h2>
+                <div class="grid two">
+                  <label>
+                    <span class="field-label"><span data-i18n="primary_color">Ana Renk</span> <span class="meta-required" aria-hidden="true">*</span></span>
+                    <input type="text" name="primary_color_hex" value="#0E2943" pattern="^#[0-9A-Fa-f]{6}$" required />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="cover_mid">Kapak Orta Tonu</span> <span class="meta-optional" data-i18n="optional">(Opsiyonel)</span></span>
+                    <input type="text" name="cover_mid_hex" value="" placeholder="#1D4FA8" pattern="^#[0-9A-Fa-f]{6}$" />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="text_color">Metin Rengi</span> <span class="meta-required" aria-hidden="true">*</span></span>
+                    <input type="text" name="text_color_hex" value="#102437" pattern="^#[0-9A-Fa-f]{6}$" required />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="gradient_type">Gradient Tipi</span> <span class="meta-optional" data-i18n="optional">(Opsiyonel)</span></span>
+                    <select name="gradient_type">
+                      <option value="glow_deep" data-i18n="gradient_deep">Derin Glow</option>
+                      <option value="diagonal_soft" data-i18n="gradient_diagonal">Diyagonal Yumuşak</option>
+                      <option value="radial_focus" data-i18n="gradient_radial">Radyal Odak</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div class="step-panel" data-step="3">
+                <h2 data-i18n="panel_data_title">Veriler ve Metin Alanları</h2>
+                <p class="hint" data-i18n="panel_data_hint">Her bölümdeki checkbox'ı açıp kapatarak ilgili yazı alanlarını anında gösterip gizleyebilirsin.</p>
+                <div id="dynamicFields"></div>
+              </div>
+
+              <div class="actions">
+                <button type="button" id="prevBtn" data-i18n="btn_prev">Geri</button>
+                <button type="button" id="nextBtn" data-i18n="btn_next">İleri</button>
+                <button type="button" id="previewBtn" data-i18n="btn_preview">Önizlemeyi Yenile</button>
+              </div>
+            </form>
+          </section>
+        </div>
+
+        <section class="preview-wrapper">
+          <div class="preview-header">
+            <h2 data-i18n="preview_title">Rapor Önizleme</h2>
+            <button id="downloadPdfBtn" type="button" data-i18n="btn_pdf">PDF Olarak İndir</button>
+          </div>
+          <article id="reportPreview" class="report-preview"></article>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>
+

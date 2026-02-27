@@ -4,6 +4,7 @@
   "description": "",
   "main": "app.js",
   "scripts": {
+    "build": "mkdir -p public && cp index.html app.js styles.css public/",
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "http-server . -p 4173 -c-1",
     "dev": "http-server . -p 4173 -c-1"
