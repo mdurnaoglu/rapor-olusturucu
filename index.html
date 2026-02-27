@@ -3,208 +3,132 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Adfolio | Ajanslar İçin Rapor ve Teklif Platformu</title>
-    <meta
-      name="description"
-      content="Adfolio ile Google Ads ve Meta Ads verilerini profesyonel white-label raporlara dönüştür, fiyat tekliflerini saniyeler içinde gönder."
-    />
+    <title>Rapor Oluşturucu</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Sora:wght@500;700;800&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;500;700;800&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
     <script src="./app.js" defer></script>
   </head>
   <body>
-    <header class="site-header">
-      <div class="container nav">
-        <a class="brand" href="#top">Adfolio</a>
-        <nav class="menu">
-          <a href="#features">Özellikler</a>
-          <a href="#pricing">Fiyatlandırma</a>
-          <a href="#contact">İletişim</a>
-        </nav>
-      </div>
-    </header>
-
-    <main id="top">
-      <section class="hero">
-        <div class="container hero-grid">
-          <div>
-            <p class="eyebrow">Ajanslar ve Freelancerlar İçin</p>
-            <h1><span>Raporu premium üret.</span> Teklifi hızla gönder.</h1>
-            <p class="hero-copy">
-              Adfolio, Google Ads ve Meta Ads çıktılarını white-label PDF formatında profesyonel hale getirir. Marka Kiti ve Şablon Kilidi ile her teslimat standardını
-              korursun.
-            </p>
-            <div class="hero-actions">
-              <a class="btn btn-primary" href="#pricing">Paketleri Gör</a>
-              <a class="btn btn-ghost" href="#contact">Demo Talep Et</a>
-            </div>
-            <div class="kpi-strip">
-              <div>
-                <strong>3x</strong>
-                <span>Daha hızlı teslim</span>
-              </div>
-              <div>
-                <strong>0</strong>
-                <span>Tasarım işiyle uğraşma</span>
-              </div>
-              <div>
-                <strong>100%</strong>
-                <span>White-label çıktı</span>
-              </div>
-            </div>
-          </div>
-
-          <aside class="hero-card">
-            <div class="hero-card-head">
-              <span class="dot"></span>
-              <span>Adfolio Dashboard Preview</span>
-            </div>
-            <div class="hero-pane">
-              <div class="hero-pill">Meta Ads</div>
-              <div class="hero-stat">
-                <span>Harcama</span>
-                <strong>₺126.400</strong>
-              </div>
-              <div class="hero-stat">
-                <span>ROAS</span>
-                <strong>4.2x</strong>
-              </div>
-            </div>
-            <div class="hero-pane">
-              <div class="hero-pill">Google Ads</div>
-              <div class="hero-stat">
-                <span>Dönüşüm</span>
-                <strong>438</strong>
-              </div>
-              <div class="hero-stat">
-                <span>CPL</span>
-                <strong>₺288</strong>
-              </div>
-            </div>
-            <p class="hero-note">Tek tık PDF ile müşteriye premium görünümlü rapor ve teklif gönder.</p>
-          </aside>
+    <main class="app-shell">
+      <header class="hero">
+        <div class="lang-switch">
+          <label for="languageSelect" data-i18n="language_label">Dil</label>
+          <select id="languageSelect">
+            <option value="tr">Türkçe</option>
+            <option value="en">English</option>
+          </select>
         </div>
-      </section>
+        <h1 data-i18n="hero_title">Ajans Rapor Oluşturucu</h1>
+        <p data-i18n="hero_subtitle">Standart cümle şablonları + değişken alanlar ile profesyonel PDF çıktısı.</p>
+      </header>
 
-      <section class="proof section">
-        <div class="container proof-bar">
-          <p>Küçük ekipten büyük ajansa kadar aynı teslim standardı</p>
-          <div>
-            <span>Marka Kiti</span>
-            <span>Şablon Kilidi</span>
-            <span>Rapor + Teklif</span>
-          </div>
+      <section class="workspace">
+        <div class="builder-pane">
+          <section class="wizard" id="wizard">
+            <div class="steps">
+              <button class="step active" data-step="1" data-i18n="step_structure">Rapor Yapısı</button>
+              <button class="step" data-step="2" data-i18n="step_theme">Tema ve Marka</button>
+              <button class="step" data-step="3" data-i18n="step_data">Veri ve İçerik</button>
+            </div>
+
+            <form id="reportForm" novalidate>
+              <div class="step-panel active" data-step="1">
+                <h2 data-i18n="panel_create_title">Nasıl bir rapor oluşturmak istiyorsun?</h2>
+                <div class="grid two">
+                  <label>
+                    <span class="field-label"><span data-i18n="report_type">Rapor Tipi</span> <span class="meta-required" aria-hidden="true">*</span></span>
+                    <select name="report_type" required>
+                      <option value="meta_performance" data-i18n="report_type_meta">Meta Reklam Performans Raporu</option>
+                      <option value="custom_performance" data-i18n="report_type_custom">Özel Performans Raporu</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="report_title">Rapor Başlığı</span> <span class="meta-required" aria-hidden="true">*</span></span>
+                    <input type="text" name="report_title" value="Meta Reklam Performans Raporu" required />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="start_date">Başlangıç Tarihi</span> <span class="meta-required" aria-hidden="true">*</span></span>
+                    <input type="date" name="report_start_date" required />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="end_date">Bitiş Tarihi</span> <span class="meta-required" aria-hidden="true">*</span></span>
+                    <input type="date" name="report_end_date" required />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="client_name">Müşteri Adı</span> <span class="meta-required" aria-hidden="true">*</span></span>
+                    <input type="text" name="client_name" placeholder="Rally Active" required />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="agency_name">Ajans Adı</span> <span class="meta-required" aria-hidden="true">*</span></span>
+                    <input type="text" name="agency_name" placeholder="Ajans Adı" required />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="agency_logo">Ajans Logosu</span> <span class="meta-optional" data-i18n="optional">(Opsiyonel)</span></span>
+                    <input type="file" name="agency_logo" accept="image/*" />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="client_logo">Müşteri Logosu</span> <span class="meta-optional" data-i18n="optional">(Opsiyonel)</span></span>
+                    <input type="file" name="client_logo" accept="image/*" />
+                  </label>
+                </div>
+              </div>
+
+              <div class="step-panel" data-step="2">
+                <h2 data-i18n="panel_theme_title">Tema ve Marka Ayarları</h2>
+                <div class="grid two">
+                  <label>
+                    <span class="field-label"><span data-i18n="primary_color">Ana Renk</span> <span class="meta-required" aria-hidden="true">*</span></span>
+                    <input type="text" name="primary_color_hex" value="#0E2943" pattern="^#[0-9A-Fa-f]{6}$" required />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="cover_mid">Kapak Orta Tonu</span> <span class="meta-optional" data-i18n="optional">(Opsiyonel)</span></span>
+                    <input type="text" name="cover_mid_hex" value="" placeholder="#1D4FA8" pattern="^#[0-9A-Fa-f]{6}$" />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="text_color">Metin Rengi</span> <span class="meta-required" aria-hidden="true">*</span></span>
+                    <input type="text" name="text_color_hex" value="#102437" pattern="^#[0-9A-Fa-f]{6}$" required />
+                  </label>
+                  <label>
+                    <span class="field-label"><span data-i18n="gradient_type">Gradient Tipi</span> <span class="meta-optional" data-i18n="optional">(Opsiyonel)</span></span>
+                    <select name="gradient_type">
+                      <option value="glow_deep" data-i18n="gradient_deep">Derin Glow</option>
+                      <option value="diagonal_soft" data-i18n="gradient_diagonal">Diyagonal Yumuşak</option>
+                      <option value="radial_focus" data-i18n="gradient_radial">Radyal Odak</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div class="step-panel" data-step="3">
+                <h2 data-i18n="panel_data_title">Veriler ve Metin Alanları</h2>
+                <p class="hint" data-i18n="panel_data_hint">Her bölümdeki checkbox'ı açıp kapatarak ilgili yazı alanlarını anında gösterip gizleyebilirsin.</p>
+                <div id="dynamicFields"></div>
+              </div>
+
+              <div class="actions">
+                <button type="button" id="prevBtn" data-i18n="btn_prev">Geri</button>
+                <button type="button" id="nextBtn" data-i18n="btn_next">İleri</button>
+                <button type="button" id="previewBtn" data-i18n="btn_preview">Önizlemeyi Yenile</button>
+              </div>
+            </form>
+          </section>
         </div>
-      </section>
 
-      <section id="features" class="section">
-        <div class="container">
-          <div class="section-head">
-            <p class="eyebrow">Öne Çıkanlar</p>
-            <h2>Ajans çıktısını bir seviye yukarı taşıyan çekirdek özellikler</h2>
+        <section class="preview-wrapper">
+          <div class="preview-header">
+            <h2 data-i18n="preview_title">Rapor Önizleme</h2>
+            <button id="downloadPdfBtn" type="button" data-i18n="btn_pdf">PDF Olarak İndir</button>
           </div>
-
-          <div class="feature-grid reveal-group">
-            <article class="feature">
-              <h3>Marka Kiti</h3>
-              <p>Logo, renk, tipografi ve kapak stilini bir kez tanımla; tüm rapor ve tekliflerde otomatik kullan.</p>
-            </article>
-            <article class="feature">
-              <h3>Şablon Kilidi</h3>
-              <p>Ajans standardını koru. Ekip üyeleri aynı kalite çizgisinde rapor ve teklif üretir.</p>
-            </article>
-            <article class="feature">
-              <h3>Google + Meta Odaklı</h3>
-              <p>Reklam verilerini anlaşılır KPI kartlarıyla sun; müşteriye okunabilir bir hikaye ver.</p>
-            </article>
-            <article class="feature">
-              <h3>White-label PDF</h3>
-              <p>Kurumsal görünümlü teslimatlar üret. Müşteri tarafında “profesyonel ajans” algısını artır.</p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section id="pricing" class="section section-pricing">
-        <div class="container">
-          <div class="section-head">
-            <p class="eyebrow">Fiyatlandırma</p>
-            <h2>Tekil + Abonelik Hibrit Model</h2>
-            <p>Paketler, aynı kullanımın tekil satın alımından daha avantajlı olacak şekilde kurgulandı.</p>
-          </div>
-
-          <div class="pricing-grid reveal-group">
-            <article class="price-card">
-              <p class="plan-type">Tekil Paket</p>
-              <h3>Pay-as-you-go</h3>
-              <ul>
-                <li>Teklif PDF: <strong>25 TL</strong></li>
-                <li>Rapor PDF: <strong>140 TL</strong></li>
-                <li>İhtiyaç oldukça ödeme</li>
-              </ul>
-            </article>
-
-            <article class="price-card featured">
-              <p class="plan-type">Starter</p>
-              <h3>490 TL<span>/ay</span></h3>
-              <p class="for">Freelancerlar için</p>
-              <ul>
-                <li>3 müşteri</li>
-                <li>3 rapor / ay</li>
-                <li>9 teklif / ay</li>
-                <li>Ek rapor: 110 TL</li>
-              </ul>
-            </article>
-
-            <article class="price-card">
-              <p class="plan-type">Medium</p>
-              <h3>1.590 TL<span>/ay</span></h3>
-              <p class="for">Orta çap ajanslar için</p>
-              <ul>
-                <li>15 müşteri</li>
-                <li>15 rapor / ay</li>
-                <li>60 teklif / ay</li>
-                <li>Ek rapor: 95 TL</li>
-              </ul>
-            </article>
-
-            <article class="price-card">
-              <p class="plan-type">Enterprise</p>
-              <h3>4.490 TL<span>/ay</span></h3>
-              <p class="for">Büyük ajanslar için</p>
-              <ul>
-                <li>50 müşteri</li>
-                <li>50 rapor / ay</li>
-                <li>250 teklif / ay</li>
-                <li>Ek rapor: 75 TL</li>
-              </ul>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="container cta">
-          <h2>Ekibini yormadan daha profesyonel görün.</h2>
-          <p>Adfolio ile operasyonu standardize et, teslim kalitesini yükselt, müşteri güvenini güçlendir.</p>
-          <a class="btn btn-primary" href="#contact">Hemen İletişime Geç</a>
-        </div>
+          <article id="reportPreview" class="report-preview"></article>
+        </section>
       </section>
     </main>
-
-    <footer id="contact" class="site-footer">
-      <div class="container footer-grid">
-        <div>
-          <p class="brand">Adfolio</p>
-          <p>Ajanslar için rapor + teklif output engine.</p>
-        </div>
-        <div>
-          <p class="footer-title">İletişim</p>
-          <a class="phone" href="tel:+905452755617">+905452755617</a>
-        </div>
-      </div>
-    </footer>
   </body>
 </html>
+
