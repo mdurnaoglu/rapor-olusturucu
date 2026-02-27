@@ -366,7 +366,7 @@ const I18N = {
   tr: {
     language_label: "Dil",
     hero_title: "Ajans Rapor Oluşturucu",
-    hero_subtitle: "Standart cümle şablonları + değişken alanlar ile profesyonel PDF çıktısı.",
+    hero_subtitle: "Pratik ve Profesyonel Raporlama",
     step_structure: "Rapor Yapısı",
     step_theme: "Tema ve Marka",
     step_data: "Veri ve İçerik",
@@ -1149,4 +1149,3 @@ downloadPdfBtn.addEventListener("click", async () => {
 });
 
 renderLivePreview();
-
