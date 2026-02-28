@@ -1754,6 +1754,98 @@ async function waitForRenderableAssets(root) {
   await new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
 
+function createPdfSandbox(printable) {
+  const sandbox = document.createElement("div");
+  sandbox.setAttribute("aria-hidden", "true");
+  sandbox.style.position = "fixed";
+  sandbox.style.left = "-100000px";
+  sandbox.style.top = "0";
+  sandbox.style.width = "794px";
+  sandbox.style.pointerEvents = "none";
+  sandbox.style.opacity = "0";
+  sandbox.style.zIndex = "-1";
+
+  const clone = printable.cloneNode(true);
+  sandbox.appendChild(clone);
+  document.body.appendChild(sandbox);
+
+  return { sandbox, clone };
+}
+
+function destroyPdfSandbox(pdfSandbox) {
+  if (!pdfSandbox?.sandbox) return;
+  pdfSandbox.sandbox.remove();
+}
+
+function openPrintFallback(printable, fileName) {
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return false;
+
+  const styleLinks = [...document.querySelectorAll('link[rel="stylesheet"]')]
+    .map((link) => `<link rel="stylesheet" href="${link.href}" />`)
+    .join("");
+  const styleBlocks = [...document.querySelectorAll("style")]
+    .map((style) => style.outerHTML)
+    .join("");
+
+  const printStyles = `
+    <style>
+      @page { size: A4; margin: 0; }
+      html, body { margin: 0; padding: 0; background: #fff; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .report-stack { gap: 0 !important; width: 210mm !important; min-width: 210mm !important; margin: 0 auto !important; }
+      .pdf-page {
+        width: 210mm !important;
+        min-height: 297mm !important;
+        box-shadow: none !important;
+        border: none !important;
+        border-radius: 0 !important;
+        page-break-after: always;
+        break-after: page;
+      }
+      .pdf-page:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+    </style>
+  `;
+
+  printWindow.document.open();
+  printWindow.document.write(`
+    <!doctype html>
+    <html lang="${getCurrentLang()}">
+      <head>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(fileName)}</title>
+        ${styleLinks}
+        ${styleBlocks}
+        ${printStyles}
+      </head>
+      <body>
+        ${printable.outerHTML}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+
+  const runPrint = () => {
+    try {
+      printWindow.focus();
+      printWindow.print();
+    } catch (_error) {
+      // Keep window open for manual print if automatic print fails.
+    }
+  };
+
+  if (printWindow.document.readyState === "complete") {
+    setTimeout(runPrint, 220);
+  } else {
+    printWindow.addEventListener("load", () => setTimeout(runPrint, 220), { once: true });
+  }
+
+  return true;
+}
+
 function bindStep1Events() {
   form.querySelectorAll('input[name="report_types"]').forEach((input) => {
     input.addEventListener("change", () => {
@@ -1895,43 +1987,64 @@ function initPdfExport() {
 
     const fileName = `${(form.client_name.value || "rapor").replace(/\s+/g, "_")}_rapor.pdf`;
 
-    const exportWithScale = (scale) =>
+    const exportWithScale = (sourceNode, scale) =>
       window
         .html2pdf()
         .set({
           margin: 8,
           filename: fileName,
-          image: { type: "jpeg", quality: 0.98 },
+          image: { type: "jpeg", quality: 0.94 },
           html2canvas: {
             scale,
             useCORS: true,
             allowTaint: true,
+            logging: false,
+            backgroundColor: "#ffffff",
             scrollX: 0,
             scrollY: 0,
-            windowWidth: printable.scrollWidth
+            width: sourceNode.scrollWidth,
+            windowWidth: sourceNode.scrollWidth
           },
           jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
           pagebreak: { mode: ["css", "legacy"] }
         })
-        .from(printable)
+        .from(sourceNode)
         .save();
 
     const originalButtonText = downloadPdfBtn.textContent;
     downloadPdfBtn.disabled = true;
     downloadPdfBtn.textContent = getCurrentLang() === "en" ? "Preparing PDF..." : "PDF hazırlanıyor...";
 
+    let pdfSandbox = null;
     try {
-      await waitForRenderableAssets(printable);
-      await exportWithScale(2);
+      pdfSandbox = createPdfSandbox(printable);
+      const sourceNode = pdfSandbox.clone;
+      await waitForRenderableAssets(sourceNode);
+
+      const scales = [1.6, 1.2, 0.9];
+      let exported = false;
+      let lastError = null;
+
+      for (const scale of scales) {
+        try {
+          await exportWithScale(sourceNode, scale);
+          exported = true;
+          break;
+        } catch (attemptError) {
+          lastError = attemptError;
+        }
+      }
+
+      if (!exported && lastError) throw lastError;
     } catch (error) {
-      try {
-        console.warn("PDF export retrying with reduced scale:", error);
-        await exportWithScale(1.35);
-      } catch (retryError) {
-        console.error("PDF export failed:", retryError);
+      console.error("PDF export failed:", error);
+      const fallbackNode = pdfSandbox?.clone || printable;
+      const opened = openPrintFallback(fallbackNode, fileName);
+      if (!opened) {
         alert("PDF oluşturulamadı. Lütfen sayfayı yenileyip tekrar deneyin.");
       }
     } finally {
+      destroyPdfSandbox(pdfSandbox);
       downloadPdfBtn.disabled = false;
       downloadPdfBtn.textContent = originalButtonText;
     }
