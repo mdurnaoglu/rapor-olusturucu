@@ -1410,6 +1410,104 @@ function getDataSnapshot() {
   };
 }
 
+function buildMetricCardMarkup(entry, lang, { compact = false, placeholder = false } = {}) {
+  const classes = ["metric-card"];
+  if (compact) classes.push("metric-card-compact");
+  if (placeholder) classes.push("is-placeholder");
+
+  return `
+    <article class="${classes.join(" ")}">
+      <span class="metric-label">${escapeHtml(entry.label || "-")}</span>
+      <strong>${escapeHtml(entry.current || "-")}</strong>
+      <small>${text("previous_period", lang)}: ${escapeHtml(entry.previous || "-")}</small>
+      ${entry.delta ? `<span class="metric-delta ${entry.delta.className}">${escapeHtml(entry.delta.text)}</span>` : ""}
+      ${entry.note ? `<p class="metric-note">${escapeHtml(entry.note)}</p>` : ""}
+    </article>
+  `;
+}
+
+function buildCompactMetricEntries(typeId, data, lang, maxCards) {
+  if (typeId === "custom") {
+    return (data.customKpis || [])
+      .filter((row) => String(row.name || "").trim())
+      .slice(0, maxCards)
+      .map((row) => {
+        const current = formatMetricValue(row.kind, row.current, data.currency, lang);
+        const previous = formatMetricValue(row.kind, row.previous, data.currency, lang);
+        return {
+          label: row.name,
+          current,
+          previous,
+          delta: formatDelta(row.current, row.previous, lang),
+          note: row.note
+        };
+      });
+  }
+
+  if (typeId === "social_media") {
+    const platformId = (data.selectedSocialPlatforms || [])[0];
+    if (!platformId) return [];
+    const selectedIds = data.selectedKpisByType[typeId] || [];
+    const platformLabel = SOCIAL_PLATFORM_LABELS[platformId]?.[lang] || platformId;
+
+    return selectedIds
+      .map((metricId) => getMetricById(typeId, metricId))
+      .filter(Boolean)
+      .slice(0, maxCards)
+      .map((metric) => {
+        const rowState = getSocialMetricState(typeId, platformId, metric.id, data.kpiValuesByType);
+        let currentRaw = rowState.current;
+        if (metric.id === "followers_growth") {
+          const startState = getSocialMetricState(typeId, platformId, "followers_start", data.kpiValuesByType);
+          const endState = getSocialMetricState(typeId, platformId, "followers_end", data.kpiValuesByType);
+          const start = parseLooseNumber(startState.current);
+          const end = parseLooseNumber(endState.current);
+          if (Number.isFinite(start) && Number.isFinite(end)) currentRaw = String(end - start);
+        }
+
+        return {
+          label: `${platformLabel} • ${metricLabel(metric, lang)}`,
+          current: formatMetricValue(metric.kind, currentRaw, data.currency, lang),
+          previous: formatMetricValue(metric.kind, rowState.previous, data.currency, lang),
+          delta: formatDelta(currentRaw, rowState.previous, lang),
+          note: rowState.note
+        };
+      });
+  }
+
+  const selectedIds = data.selectedKpisByType[typeId] || [];
+  return selectedIds
+    .map((metricId) => getMetricById(typeId, metricId))
+    .filter(Boolean)
+    .slice(0, maxCards)
+    .map((metric) => {
+      const rowState = data.kpiValuesByType[typeId]?.[metric.id] || { current: "", previous: "", note: "" };
+      return {
+        label: metricLabel(metric, lang),
+        current: formatMetricValue(metric.kind, rowState.current, data.currency, lang),
+        previous: formatMetricValue(metric.kind, rowState.previous, data.currency, lang),
+        delta: formatDelta(rowState.current, rowState.previous, lang),
+        note: rowState.note
+      };
+    });
+}
+
+function renderCompactMetricCards(typeId, data, lang, maxCards = 4) {
+  const entries = buildCompactMetricEntries(typeId, data, lang, maxCards);
+  const normalized = [...entries];
+  while (normalized.length < maxCards) {
+    normalized.push({ label: "-", current: "-", previous: "-", delta: null, note: "", placeholder: true });
+  }
+
+  return `
+    <div class="metric-grid metric-grid-four">
+      ${normalized
+        .map((entry) => buildMetricCardMarkup(entry, lang, { compact: true, placeholder: Boolean(entry.placeholder) }))
+        .join("")}
+    </div>
+  `;
+}
+
 function renderMetricCards(typeId, data, lang) {
   if (typeId === "custom") {
     const customRows = (data.customKpis || []).filter((row) => String(row.name || "").trim());
@@ -1551,21 +1649,23 @@ function renderCreativeSummary(typeId, data, lang) {
   `;
 }
 
-function renderTypeSection(typeId, data, lang) {
+function renderTypeSection(typeId, data, lang, options = {}) {
+  const compact = Boolean(options.compact);
+  const maxCards = Number.isFinite(options.maxCards) ? options.maxCards : 4;
   const typeLabel = getDisplayTypeLabel(typeId, lang, data.customModules || []);
   const imageState = data.reportImageByType[typeId] || { position: "start", src: "" };
   const imageHtml = imageState.src
     ? `<figure class="section-image"><img src="${imageState.src}" alt="${escapeHtml(typeLabel)}" /></figure>`
     : "";
 
-  const contentHtml = renderMetricCards(typeId, data, lang);
-  const creativeHtml = renderCreativeSummary(typeId, data, lang);
-  const noteHtml = data.reportNotesByType[typeId]
+  const contentHtml = compact ? renderCompactMetricCards(typeId, data, lang, maxCards) : renderMetricCards(typeId, data, lang);
+  const creativeHtml = compact ? "" : renderCreativeSummary(typeId, data, lang);
+  const noteHtml = !compact && data.reportNotesByType[typeId]
     ? `<div class="general-note"><h4>${text("general_note", lang)}</h4><p>${escapeHtml(data.reportNotesByType[typeId])}</p></div>`
     : "";
 
   const socialPlatformsHtml =
-    typeId === "social_media" && data.selectedSocialPlatforms.length
+    !compact && typeId === "social_media" && data.selectedSocialPlatforms.length
       ? `
         <div class="inline-pills preview-pills">
           <strong>${text("social_platforms", lang)}:</strong>
@@ -1577,7 +1677,7 @@ function renderTypeSection(typeId, data, lang) {
       : "";
 
   const customModuleHtml =
-    typeId === "custom" && data.customModules.length
+    !compact && typeId === "custom" && data.customModules.length
       ? `
         <div class="inline-pills preview-pills">
           <strong>${text("custom_modules", lang)}:</strong>
@@ -1587,7 +1687,7 @@ function renderTypeSection(typeId, data, lang) {
       : "";
 
   return `
-    <section class="type-page-block">
+    <section class="type-page-block ${compact ? "compact-type-section" : ""}">
       <header class="page-head">
         <h2>${escapeHtml(typeLabel)}</h2>
         <p>${escapeHtml(data.client_name || "-")} • ${escapeHtml(data.report_period || "-")}</p>
@@ -1595,12 +1695,12 @@ function renderTypeSection(typeId, data, lang) {
       <div class="content">
         ${socialPlatformsHtml}
         ${customModuleHtml}
-        ${imageState.position === "start" ? imageHtml : ""}
+        ${!compact && imageState.position === "start" ? imageHtml : ""}
         ${contentHtml}
-        ${imageState.position === "middle" ? imageHtml : ""}
+        ${!compact && imageState.position === "middle" ? imageHtml : ""}
         ${creativeHtml}
         ${noteHtml}
-        ${imageState.position === "end" ? imageHtml : ""}
+        ${!compact && imageState.position === "end" ? imageHtml : ""}
       </div>
     </section>
   `;
@@ -1612,30 +1712,6 @@ function chunkArray(items, chunkSize) {
     chunks.push(items.slice(index, index + chunkSize));
   }
   return chunks;
-}
-
-const A4_PAGE_HEIGHT_PX = 1123;
-
-function fitReportPagesToA4(root) {
-  if (!root) return;
-  const pages = [...root.querySelectorAll(".pdf-page")];
-  pages.forEach((page) => {
-    if (!(page instanceof HTMLElement)) return;
-    const inner = page.querySelector(".pdf-page-inner");
-    if (!(inner instanceof HTMLElement)) return;
-
-    page.classList.remove("is-scaled");
-    page.style.removeProperty("--page-scale");
-    inner.style.removeProperty("width");
-
-    const contentHeight = inner.scrollHeight;
-    if (!Number.isFinite(contentHeight) || contentHeight <= A4_PAGE_HEIGHT_PX) return;
-
-    const scale = A4_PAGE_HEIGHT_PX / contentHeight;
-    page.classList.add("is-scaled");
-    page.style.setProperty("--page-scale", String(scale));
-    inner.style.width = `${(100 / scale).toFixed(4)}%`;
-  });
 }
 
 function renderPreview(data) {
@@ -1671,10 +1747,8 @@ function renderPreview(data) {
     <article class="pdf-page" style="--page-bg:${theme.pageBg};--page-text:${theme.textColor};--card-bg:${theme.cardBg};--card-line:${theme.cardBorder};--muted:${theme.muted};--accent:${theme.accentColor};">
       <div class="pdf-page-inner">
         <section class="cover" style="background:${coverBackground};color:${theme.headingColor};--cover-h1:${theme.h1}px;--cover-h2:${theme.h2}px;">
-          <div class="logo-slot logo-left">
+          <div class="cover-brand-row">
             <div class="logo-box">${data.agency_logo ? `<img src="${data.agency_logo}" alt="Ajans logosu" />` : `<span>${escapeHtml(data.agency_name || "Ajans")}</span>`}</div>
-          </div>
-          <div class="logo-slot logo-right">
             <div class="logo-box">${data.client_logo ? `<img src="${data.client_logo}" alt="Müşteri logosu" />` : `<span>${escapeHtml(data.client_name || "Müşteri")}</span>`}</div>
           </div>
 
@@ -1700,11 +1774,9 @@ function renderPreview(data) {
   const pages = reportTypes.length
     ? chunkArray(reportTypes, 2)
         .map((typePair) => {
-          const sections = typePair
-            .map((typeId, index) => `${renderTypeSection(typeId, data, lang)}${index < typePair.length - 1 ? '<hr class="type-divider" />' : ""}`)
-            .join("");
+          const sections = typePair.map((typeId) => renderTypeSection(typeId, data, lang, { compact: true, maxCards: 4 })).join("");
           return `
-            <article class="pdf-page" style="--page-bg:${theme.pageBg};--page-text:${theme.textColor};--card-bg:${theme.cardBg};--card-line:${theme.cardBorder};--muted:${theme.muted};--accent:${theme.accentColor};">
+            <article class="pdf-page ${typePair.length === 2 ? "pair-page" : "single-page"}" style="--page-bg:${theme.pageBg};--page-text:${theme.textColor};--card-bg:${theme.cardBg};--card-line:${theme.cardBorder};--muted:${theme.muted};--accent:${theme.accentColor};">
               <div class="pdf-page-inner">
                 ${sections}
               </div>
@@ -1712,7 +1784,7 @@ function renderPreview(data) {
           `;
         })
         .join("")
-    : `<article class="pdf-page"><section class="content"><p>${text("no_sections", lang)}</p></section></article>`;
+    : `<article class="pdf-page"><div class="pdf-page-inner"><section class="content"><p>${text("no_sections", lang)}</p></section></div></article>`;
 
   previewContainer.innerHTML = `
     <div class="report-stack" style="--report-font:${theme.fontFamily};--report-body:${theme.body}px;--report-h3:${theme.h3}px;--report-kpi:${theme.kpi}px;--report-accent:${theme.accentColor};--report-text:${theme.textColor};">
@@ -1720,19 +1792,6 @@ function renderPreview(data) {
       ${pages}
     </div>
   `;
-
-  const reportStack = previewContainer.querySelector(".report-stack");
-  if (reportStack instanceof HTMLElement) {
-    fitReportPagesToA4(reportStack);
-    requestAnimationFrame(() => {
-      if (reportStack.isConnected) fitReportPagesToA4(reportStack);
-    });
-    if (document.fonts && typeof document.fonts.ready?.then === "function") {
-      document.fonts.ready.then(() => {
-        if (reportStack.isConnected) fitReportPagesToA4(reportStack);
-      });
-    }
-  }
 }
 
 function renderLivePreview() {
@@ -2062,7 +2121,6 @@ function initPdfExport() {
     try {
       pdfSandbox = createPdfSandbox(printable);
       const sourceNode = pdfSandbox.clone;
-      fitReportPagesToA4(sourceNode);
       await waitForRenderableAssets(sourceNode);
 
       const scales = [1.6, 1.2, 0.9];

@@ -861,18 +861,14 @@ textarea {
   min-height: 100%;
 }
 
-.pdf-page.is-scaled .pdf-page-inner {
-  transform: scale(var(--page-scale, 1));
-  transform-origin: top left;
-}
-
 .cover {
   min-height: 310px;
   position: relative;
   overflow: hidden;
-  padding: 20px 26px 26px;
-  display: grid;
-  gap: 8px;
+  padding: 18px 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .cover::after {
@@ -885,19 +881,13 @@ textarea {
   pointer-events: none;
 }
 
-.logo-slot {
-  position: absolute;
-  top: 16px;
-  width: 184px;
+.cover-brand-row {
+  position: relative;
   z-index: 3;
-}
-
-.logo-left {
-  left: 16px;
-}
-
-.logo-right {
-  right: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
 
 .logo-box {
@@ -923,10 +913,10 @@ textarea {
 }
 
 .cover-top-tags {
-  position: absolute;
-  top: 96px;
-  right: 16px;
+  position: relative;
   display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
   z-index: 3;
 }
@@ -951,8 +941,8 @@ textarea {
 .cover-content {
   position: relative;
   z-index: 2;
-  margin-top: 94px;
-  max-width: calc(100% - 210px);
+  margin-top: 2px;
+  max-width: 100%;
   display: grid;
   gap: 6px;
 }
@@ -1042,6 +1032,60 @@ textarea {
 
 .type-page-block .content {
   padding: 14px 20px 16px;
+}
+
+.pair-page .pdf-page-inner {
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.pair-page .type-page-block {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.pair-page .type-page-block + .type-page-block {
+  border-top: 1px dashed var(--card-line, #d3dfe8);
+}
+
+.compact-type-section .page-head {
+  padding: 11px 16px;
+}
+
+.compact-type-section .page-head h2 {
+  font-size: 24px;
+}
+
+.compact-type-section .page-head p {
+  font-size: 12px;
+}
+
+.compact-type-section .content {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.metric-grid-four {
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metric-card-compact {
+  min-height: 132px;
+  gap: 3px;
+}
+
+.metric-card-compact strong {
+  font-size: 28px;
+}
+
+.metric-card.is-placeholder {
+  border-style: dashed;
+  opacity: 0.62;
 }
 
 .type-divider {
@@ -1244,12 +1288,9 @@ textarea {
     min-width: 0;
   }
 
-  .logo-slot {
-    position: relative;
-    width: 100%;
-    left: 0;
-    right: 0;
-    top: 0;
+  .cover-brand-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .logo-box {
@@ -1257,20 +1298,7 @@ textarea {
   }
 
   .cover-top-tags {
-    position: relative;
-    top: 0;
-    right: 0;
-    margin-top: 8px;
-    margin-bottom: 8px;
-  }
-
-  .cover-content {
-    margin-top: 0;
-    max-width: 100%;
-  }
-
-  .eyebrow {
-    margin-top: 0;
+    justify-content: flex-start;
   }
 }
 
