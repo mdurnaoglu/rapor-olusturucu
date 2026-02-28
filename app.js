@@ -417,6 +417,11 @@ const customModuleBlock = document.getElementById("customModuleBlock");
 const customModuleInput = document.getElementById("customModuleInput");
 const addCustomModuleBtn = document.getElementById("addCustomModuleBtn");
 const customModuleList = document.getElementById("customModuleList");
+const colorHexInputMap = new Map(
+  [...document.querySelectorAll("[data-hex-for]")]
+    .filter((input) => input instanceof HTMLInputElement && input.dataset.hexFor)
+    .map((input) => [input.dataset.hexFor, input])
+);
 
 const state = {
   currentStep: 1,
@@ -454,6 +459,62 @@ function getCurrentLang() {
 
 function getLocale(lang) {
   return lang === "en" ? "en-US" : "tr-TR";
+}
+
+function normalizeHexColor(value) {
+  const stripped = String(value || "")
+    .trim()
+    .replace(/^#/, "");
+  if (!/^[0-9a-fA-F]{6}$/.test(stripped)) return null;
+  return `#${stripped.toUpperCase()}`;
+}
+
+function getColorFieldByName(fieldName) {
+  const field = form.elements.namedItem(fieldName);
+  return field instanceof HTMLInputElement ? field : null;
+}
+
+function syncHexInputForField(fieldName) {
+  const hexInput = colorHexInputMap.get(fieldName);
+  const colorInput = getColorFieldByName(fieldName);
+  if (!hexInput || !colorInput) return;
+  hexInput.value = String(colorInput.value || "").toUpperCase();
+}
+
+function syncAllHexInputs() {
+  colorHexInputMap.forEach((_input, fieldName) => {
+    syncHexInputForField(fieldName);
+  });
+}
+
+function bindColorHexInputs() {
+  colorHexInputMap.forEach((hexInput, fieldName) => {
+    const colorInput = getColorFieldByName(fieldName);
+    if (!colorInput) return;
+
+    const syncFromColor = () => syncHexInputForField(fieldName);
+    colorInput.addEventListener("input", syncFromColor);
+    colorInput.addEventListener("change", syncFromColor);
+
+    hexInput.addEventListener("input", () => {
+      const normalized = normalizeHexColor(hexInput.value);
+      if (!normalized) return;
+      colorInput.value = normalized;
+      hexInput.value = normalized;
+    });
+
+    hexInput.addEventListener("blur", () => {
+      const normalized = normalizeHexColor(hexInput.value);
+      if (!normalized) {
+        syncHexInputForField(fieldName);
+        return;
+      }
+      colorInput.value = normalized;
+      hexInput.value = normalized;
+    });
+  });
+
+  syncAllHexInputs();
 }
 
 function reportTypeLabel(typeId, lang) {
@@ -717,6 +778,7 @@ function setThemeMode(mode) {
   form.accent_color.value = defaults.accentColor;
   form.gradient_color_1.value = defaults.gradientColor1;
   form.gradient_color_2.value = defaults.gradientColor2;
+  syncAllHexInputs();
 }
 
 function applyThemePreset(presetId, schedule = true) {
@@ -735,6 +797,7 @@ function applyThemePreset(presetId, schedule = true) {
   form.font_family.value = preset.fontFamily;
   form.heading_size.value = preset.headingSize;
   form.body_size.value = preset.bodySize;
+  syncAllHexInputs();
 
   if (schedule) scheduleLivePreview();
 }
@@ -1792,6 +1855,7 @@ function bootstrap() {
   syncStateFromStep1();
   updateStep1ConditionalBlocks();
   renderCustomModuleChips();
+  bindColorHexInputs();
   applyThemePreset("theme_1", false);
   renderDynamicFields();
   syncPeriodField();

@@ -248,6 +248,24 @@ input[type="color"] {
   height: 42px;
 }
 
+.color-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.color-control input[type="text"] {
+  font-family: "Inter", sans-serif;
+  text-transform: uppercase;
+}
+
+.color-control input[type="color"] {
+  width: 56px;
+  min-width: 56px;
+  padding: 3px;
+}
+
 textarea {
   min-height: 78px;
   resize: vertical;
