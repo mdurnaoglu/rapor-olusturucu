@@ -464,6 +464,15 @@ function metricLabel(metricObj, lang) {
   return metricObj?.label?.[lang] || metricObj?.id || "";
 }
 
+function socialMetricKey(platformId, metricId) {
+  return `${platformId}::${metricId}`;
+}
+
+function getSocialMetricState(typeId, platformId, metricId, bucket) {
+  const key = socialMetricKey(platformId, metricId);
+  return bucket?.[typeId]?.[key] || { current: "", previous: "", note: "" };
+}
+
 function readSelectedCheckboxValues(name) {
   return [...form.querySelectorAll(`input[name="${name}"]:checked`)].map((input) => input.value);
 }
@@ -773,6 +782,45 @@ function buildSelectedKpiInputsHtml(typeId, lang) {
   }
 
   const metrics = getFlattenKpis(typeId).filter((item) => selectedSet.has(item.id));
+
+  if (typeId === "social_media") {
+    const selectedPlatforms = [...state.selectedSocialPlatforms];
+    if (!selectedPlatforms.length) {
+      return `<p class="inline-note">${text("no_kpi_selected", lang)}</p>`;
+    }
+
+    return selectedPlatforms
+      .map((platformId) => {
+        const platformLabel = SOCIAL_PLATFORM_LABELS[platformId]?.[lang] || platformId;
+        const rows = metrics
+          .map((item) => {
+            const metricKey = socialMetricKey(platformId, item.id);
+            const metricState = state.kpiValuesByType[typeId]?.[metricKey] || { current: "", previous: "", note: "" };
+            return `
+              <div class="kpi-input-row">
+                <div class="kpi-input-row-head">
+                  <strong>${escapeHtml(metricLabel(item, lang))}</strong>
+                  <span>${escapeHtml(item.kind)}</span>
+                </div>
+                <div class="kpi-input-row-grid">
+                  <input type="text" data-kpi-current="${typeId}" data-kpi-id="${metricKey}" value="${escapeHtml(metricState.current)}" placeholder="${text("current_period", lang)}" />
+                  <input type="text" data-kpi-previous="${typeId}" data-kpi-id="${metricKey}" value="${escapeHtml(metricState.previous)}" placeholder="${text("previous_optional", lang)}" />
+                  <input type="text" data-kpi-note="${typeId}" data-kpi-id="${metricKey}" value="${escapeHtml(metricState.note)}" placeholder="${text("kpi_note", lang)}" />
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+
+        return `
+          <section class="platform-kpi-block">
+            <h4>${escapeHtml(platformLabel)}</h4>
+            <div class="platform-kpi-rows">${rows}</div>
+          </section>
+        `;
+      })
+      .join("");
+  }
 
   return metrics
     .map((item) => {
@@ -1236,6 +1284,62 @@ function renderMetricCards(typeId, data, lang) {
                 ${delta ? `<span class="metric-delta ${delta.className}">${escapeHtml(delta.text)}</span>` : ""}
                 ${row.note ? `<p class="metric-note">${escapeHtml(row.note)}</p>` : ""}
               </article>
+            `;
+          })
+          .join("")}
+      </div>
+    `;
+  }
+
+  if (typeId === "social_media") {
+    const selectedIds = data.selectedKpisByType[typeId] || [];
+    const metrics = getFlattenKpis(typeId).filter((item) => selectedIds.includes(item.id));
+    const platforms = data.selectedSocialPlatforms || [];
+
+    if (!metrics.length || !platforms.length) {
+      return `<p class="empty-placeholder">${text("no_kpi_selected", lang)}</p>`;
+    }
+
+    return `
+      <div class="platform-preview-stack">
+        ${platforms
+          .map((platformId) => {
+            const platformLabel = SOCIAL_PLATFORM_LABELS[platformId]?.[lang] || platformId;
+            const cards = metrics
+              .map((item) => {
+                const rowState = getSocialMetricState(typeId, platformId, item.id, data.kpiValuesByType);
+                let currentRaw = rowState.current;
+                if (item.id === "followers_growth") {
+                  const followersStartState = getSocialMetricState(typeId, platformId, "followers_start", data.kpiValuesByType);
+                  const followersEndState = getSocialMetricState(typeId, platformId, "followers_end", data.kpiValuesByType);
+                  const start = parseLooseNumber(followersStartState.current);
+                  const end = parseLooseNumber(followersEndState.current);
+                  if (Number.isFinite(start) && Number.isFinite(end)) {
+                    currentRaw = String(end - start);
+                  }
+                }
+
+                const current = formatMetricValue(item.kind, currentRaw, data.currency, lang);
+                const previous = formatMetricValue(item.kind, rowState.previous, data.currency, lang);
+                const delta = formatDelta(currentRaw, rowState.previous, lang);
+
+                return `
+                  <article class="metric-card">
+                    <span class="metric-label">${escapeHtml(metricLabel(item, lang))}</span>
+                    <strong>${escapeHtml(current)}</strong>
+                    <small>${text("previous_period", lang)}: ${escapeHtml(previous)}</small>
+                    ${delta ? `<span class="metric-delta ${delta.className}">${escapeHtml(delta.text)}</span>` : ""}
+                    ${rowState.note ? `<p class="metric-note">${escapeHtml(rowState.note)}</p>` : ""}
+                  </article>
+                `;
+              })
+              .join("");
+
+            return `
+              <section class="platform-preview-block">
+                <h4>${escapeHtml(platformLabel)}</h4>
+                <div class="metric-grid">${cards}</div>
+              </section>
             `;
           })
           .join("")}
