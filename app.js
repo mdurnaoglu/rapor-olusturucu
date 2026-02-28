@@ -1877,77 +1877,6 @@ function destroyPdfSandbox(pdfSandbox) {
   pdfSandbox.sandbox.remove();
 }
 
-function openPrintFallback(printable, fileName) {
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) return false;
-
-  const styleLinks = [...document.querySelectorAll('link[rel="stylesheet"]')]
-    .map((link) => `<link rel="stylesheet" href="${link.href}" />`)
-    .join("");
-  const styleBlocks = [...document.querySelectorAll("style")]
-    .map((style) => style.outerHTML)
-    .join("");
-
-  const printStyles = `
-    <style>
-      @page { size: A4; margin: 0; }
-      html, body { margin: 0; padding: 0; background: #fff; }
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      .report-stack { gap: 0 !important; width: 210mm !important; min-width: 210mm !important; margin: 0 auto !important; }
-      .pdf-page {
-        width: 210mm !important;
-        height: 297mm !important;
-        min-height: 297mm !important;
-        overflow: hidden !important;
-        box-shadow: none !important;
-        border: none !important;
-        border-radius: 0 !important;
-        page-break-after: always;
-        break-after: page;
-      }
-      .pdf-page:last-child {
-        page-break-after: auto;
-        break-after: auto;
-      }
-    </style>
-  `;
-
-  printWindow.document.open();
-  printWindow.document.write(`
-    <!doctype html>
-    <html lang="${getCurrentLang()}">
-      <head>
-        <meta charset="utf-8" />
-        <title>${escapeHtml(fileName)}</title>
-        ${styleLinks}
-        ${styleBlocks}
-        ${printStyles}
-      </head>
-      <body>
-        ${printable.outerHTML}
-      </body>
-    </html>
-  `);
-  printWindow.document.close();
-
-  const runPrint = () => {
-    try {
-      printWindow.focus();
-      printWindow.print();
-    } catch (_error) {
-      // Keep window open for manual print if automatic print fails.
-    }
-  };
-
-  if (printWindow.document.readyState === "complete") {
-    setTimeout(runPrint, 220);
-  } else {
-    printWindow.addEventListener("load", () => setTimeout(runPrint, 220), { once: true });
-  }
-
-  return true;
-}
-
 function bindStep1Events() {
   form.querySelectorAll('input[name="report_types"]').forEach((input) => {
     input.addEventListener("change", () => {
@@ -2140,11 +2069,7 @@ function initPdfExport() {
       if (!exported && lastError) throw lastError;
     } catch (error) {
       console.error("PDF export failed:", error);
-      const fallbackNode = pdfSandbox?.clone || printable;
-      const opened = openPrintFallback(fallbackNode, fileName);
-      if (!opened) {
-        alert("PDF oluşturulamadı. Lütfen sayfayı yenileyip tekrar deneyin.");
-      }
+      alert("PDF oluşturulamadı. Lütfen sayfayı yenileyip tekrar deneyin.");
     } finally {
       destroyPdfSandbox(pdfSandbox);
       downloadPdfBtn.disabled = false;
