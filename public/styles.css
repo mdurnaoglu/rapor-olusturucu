@@ -992,6 +992,24 @@ textarea {
   padding: 16px 20px 20px;
 }
 
+.type-page-block .page-head {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.type-page-block .page-head h2 {
+  font-size: 26px;
+}
+
+.type-page-block .content {
+  padding: 14px 20px 16px;
+}
+
+.type-divider {
+  margin: 0 20px;
+  border: 0;
+  border-top: 1px dashed var(--card-line, #d3dfe8);
+}
+
 .preview-pills {
   margin-bottom: 12px;
 }

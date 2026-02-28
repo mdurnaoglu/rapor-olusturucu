@@ -1406,7 +1406,7 @@ function renderCreativeSummary(typeId, data, lang) {
   `;
 }
 
-function renderTypePage(typeId, data, lang, theme) {
+function renderTypeSection(typeId, data, lang) {
   const typeLabel = reportTypeLabel(typeId, lang);
   const imageState = data.reportImageByType[typeId] || { position: "start", src: "" };
   const imageHtml = imageState.src
@@ -1442,12 +1442,12 @@ function renderTypePage(typeId, data, lang, theme) {
       : "";
 
   return `
-    <article class="pdf-page" style="--page-bg:${theme.pageBg};--page-text:${theme.textColor};--card-bg:${theme.cardBg};--card-line:${theme.cardBorder};--muted:${theme.muted};--accent:${theme.accentColor};">
+    <section class="type-page-block">
       <header class="page-head">
         <h2>${escapeHtml(typeLabel)}</h2>
         <p>${escapeHtml(data.client_name || "-")} • ${escapeHtml(data.report_period || "-")}</p>
       </header>
-      <section class="content">
+      <div class="content">
         ${socialPlatformsHtml}
         ${customModuleHtml}
         ${imageState.position === "start" ? imageHtml : ""}
@@ -1456,9 +1456,17 @@ function renderTypePage(typeId, data, lang, theme) {
         ${creativeHtml}
         ${noteHtml}
         ${imageState.position === "end" ? imageHtml : ""}
-      </section>
-    </article>
+      </div>
+    </section>
   `;
+}
+
+function chunkArray(items, chunkSize) {
+  const chunks = [];
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize));
+  }
+  return chunks;
 }
 
 function renderPreview(data) {
@@ -1506,7 +1514,18 @@ function renderPreview(data) {
   `;
 
   const pages = reportTypes.length
-    ? reportTypes.map((typeId) => renderTypePage(typeId, data, lang, theme)).join("")
+    ? chunkArray(reportTypes, 2)
+        .map((typePair) => {
+          const sections = typePair
+            .map((typeId, index) => `${renderTypeSection(typeId, data, lang)}${index < typePair.length - 1 ? '<hr class="type-divider" />' : ""}`)
+            .join("");
+          return `
+            <article class="pdf-page" style="--page-bg:${theme.pageBg};--page-text:${theme.textColor};--card-bg:${theme.cardBg};--card-line:${theme.cardBorder};--muted:${theme.muted};--accent:${theme.accentColor};">
+              ${sections}
+            </article>
+          `;
+        })
+        .join("")
     : `<article class="pdf-page"><section class="content"><p>${text("no_sections", lang)}</p></section></article>`;
 
   previewContainer.innerHTML = `
