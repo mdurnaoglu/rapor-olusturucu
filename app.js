@@ -464,6 +464,21 @@ function metricLabel(metricObj, lang) {
   return metricObj?.label?.[lang] || metricObj?.id || "";
 }
 
+function getCustomModuleLabels(customModules) {
+  return (customModules || []).map((item) => String(item || "").trim()).filter(Boolean);
+}
+
+function getCustomDisplayTitle(lang, customModules) {
+  const labels = getCustomModuleLabels(customModules);
+  if (labels.length) return labels.join(" • ");
+  return reportTypeLabel("custom", lang);
+}
+
+function getDisplayTypeLabel(typeId, lang, customModules) {
+  if (typeId === "custom") return getCustomDisplayTitle(lang, customModules);
+  return reportTypeLabel(typeId, lang);
+}
+
 function socialMetricKey(platformId, metricId) {
   return `${platformId}::${metricId}`;
 }
@@ -952,7 +967,9 @@ function renderDynamicFields() {
     .map((typeId) => {
       ensureTypeState(typeId);
       const config = REPORT_CONFIG[typeId];
-      const typeTitle = config?.label?.[lang] || config?.label?.tr || typeId;
+      const typeTitle = typeId === "custom"
+        ? getDisplayTypeLabel("custom", lang, state.customModules)
+        : config?.label?.[lang] || config?.label?.tr || typeId;
 
       const typeSpecific =
         typeId === "custom"
@@ -1407,7 +1424,7 @@ function renderCreativeSummary(typeId, data, lang) {
 }
 
 function renderTypeSection(typeId, data, lang) {
-  const typeLabel = reportTypeLabel(typeId, lang);
+  const typeLabel = getDisplayTypeLabel(typeId, lang, data.customModules || []);
   const imageState = data.reportImageByType[typeId] || { position: "start", src: "" };
   const imageHtml = imageState.src
     ? `<figure class="section-image"><img src="${imageState.src}" alt="${escapeHtml(typeLabel)}" /></figure>`
@@ -1479,16 +1496,22 @@ function renderPreview(data) {
     ? goals.map((goal) => GOAL_LABELS[goal]?.[lang] || goal).join(" • ")
     : "-";
 
-  const reportTypeBadges = reportTypes.length
-    ? reportTypes.map((typeId) => `<span>${escapeHtml(reportTypeLabel(typeId, lang))}</span>`).join("")
-    : "";
+  const typeBadges = reportTypes.length
+    ? reportTypes
+        .map((typeId) => {
+          if (typeId !== "custom") {
+            return `<span>${escapeHtml(reportTypeLabel(typeId, lang))}</span>`;
+          }
 
-  const customModuleBadges =
-    reportTypes.includes("custom") && (data.customModules || []).length
-      ? data.customModules.map((module) => `<span class="module-chip">${escapeHtml(module)}</span>`).join("")
-      : "";
+          const customModules = getCustomModuleLabels(data.customModules);
+          if (!customModules.length) {
+            return `<span>${escapeHtml(reportTypeLabel("custom", lang))}</span>`;
+          }
 
-  const typeBadges = reportTypeBadges || customModuleBadges ? `${reportTypeBadges}${customModuleBadges}` : `<span>-</span>`;
+          return customModules.map((module) => `<span class="module-chip">${escapeHtml(module)}</span>`).join("");
+        })
+        .join("")
+    : `<span>-</span>`;
 
   const coverBackground = buildCoverBackground(theme);
 
