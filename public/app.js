@@ -493,9 +493,30 @@ function validateDateRange({ showMessage = false } = {}) {
 function normalizeHexColor(value) {
   const stripped = String(value || "")
     .trim()
-    .replace(/^#/, "");
-  if (!/^[0-9a-fA-F]{6}$/.test(stripped)) return null;
-  return `#${stripped.toUpperCase()}`;
+    .replace(/^#/, "")
+    .replace(/[^0-9a-fA-F]/g, "")
+    .toUpperCase();
+
+  if (/^[0-9A-F]{3}$/.test(stripped)) {
+    return `#${stripped
+      .split("")
+      .map((char) => `${char}${char}`)
+      .join("")}`;
+  }
+
+  if (/^[0-9A-F]{6}$/.test(stripped)) {
+    return `#${stripped}`;
+  }
+
+  return null;
+}
+
+function sanitizeHexDraft(value) {
+  const stripped = String(value || "")
+    .replace(/[^0-9a-fA-F]/g, "")
+    .slice(0, 6)
+    .toUpperCase();
+  return stripped ? `#${stripped}` : "";
 }
 
 function getColorFieldByName(fieldName) {
@@ -525,22 +546,31 @@ function bindColorHexInputs() {
     colorInput.addEventListener("input", syncFromColor);
     colorInput.addEventListener("change", syncFromColor);
 
-    hexInput.addEventListener("input", () => {
+    const applyHexValue = ({ commit = false } = {}) => {
       const normalized = normalizeHexColor(hexInput.value);
-      if (!normalized) return;
-      colorInput.value = normalized;
-      hexInput.value = normalized;
-    });
+      const hasValue = Boolean(String(hexInput.value || "").trim());
 
-    hexInput.addEventListener("blur", () => {
-      const normalized = normalizeHexColor(hexInput.value);
       if (!normalized) {
-        syncHexInputForField(fieldName);
+        hexInput.classList.toggle("hex-invalid", hasValue);
+        if (commit) syncHexInputForField(fieldName);
         return;
       }
-      colorInput.value = normalized;
+
+      hexInput.classList.remove("hex-invalid");
+      if (colorInput.value.toUpperCase() !== normalized) {
+        colorInput.value = normalized;
+        colorInput.dispatchEvent(new Event("input", { bubbles: true }));
+      }
       hexInput.value = normalized;
+    };
+
+    hexInput.addEventListener("input", () => {
+      hexInput.value = sanitizeHexDraft(hexInput.value);
+      applyHexValue();
     });
+
+    hexInput.addEventListener("change", () => applyHexValue({ commit: true }));
+    hexInput.addEventListener("blur", () => applyHexValue({ commit: true }));
   });
 
   syncAllHexInputs();

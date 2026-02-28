@@ -260,6 +260,11 @@ input[type="color"] {
   text-transform: uppercase;
 }
 
+.color-control input[type="text"].hex-invalid {
+  border-color: #cb3d3d;
+  box-shadow: 0 0 0 1px rgba(203, 61, 61, 0.2);
+}
+
 .color-control input[type="color"] {
   width: 56px;
   min-width: 56px;
