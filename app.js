@@ -2011,36 +2011,12 @@ function initPdfExport() {
       return;
     }
 
-    if (typeof window.html2pdf !== "function") {
+    if (typeof window.html2canvas !== "function" || !window.jspdf?.jsPDF) {
       alert("PDF kütüphanesi yüklenemedi. Sayfayı yenileyip tekrar deneyin.");
       return;
     }
 
     const fileName = `${(form.client_name.value || "rapor").replace(/\s+/g, "_")}_rapor.pdf`;
-
-    const exportWithScale = (sourceNode, scale) =>
-      window
-        .html2pdf()
-        .set({
-          margin: 8,
-          filename: fileName,
-          image: { type: "jpeg", quality: 0.94 },
-          html2canvas: {
-            scale,
-            useCORS: true,
-            allowTaint: true,
-            logging: false,
-            backgroundColor: "#ffffff",
-            scrollX: 0,
-            scrollY: 0,
-            width: sourceNode.scrollWidth,
-            windowWidth: sourceNode.scrollWidth
-          },
-          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-          pagebreak: { mode: ["css", "legacy"] }
-        })
-        .from(sourceNode)
-        .save();
 
     const originalButtonText = downloadPdfBtn.textContent;
     downloadPdfBtn.disabled = true;
@@ -2051,22 +2027,49 @@ function initPdfExport() {
       pdfSandbox = createPdfSandbox(printable);
       const sourceNode = pdfSandbox.clone;
       await waitForRenderableAssets(sourceNode);
+      const pageNodes = [...sourceNode.querySelectorAll(".pdf-page")];
+      const pages = pageNodes.length ? pageNodes : [sourceNode];
 
-      const scales = [1.6, 1.2, 0.9];
-      let exported = false;
-      let lastError = null;
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+        compress: true
+      });
 
-      for (const scale of scales) {
-        try {
-          await exportWithScale(sourceNode, scale);
-          exported = true;
-          break;
-        } catch (attemptError) {
-          lastError = attemptError;
-        }
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 8;
+      const contentWidth = pageWidth - margin * 2;
+      const contentHeight = pageHeight - margin * 2;
+
+      for (let index = 0; index < pages.length; index += 1) {
+        const node = pages[index];
+        const canvas = await window.html2canvas(node, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: false,
+          logging: false,
+          backgroundColor: "#ffffff",
+          scrollX: 0,
+          scrollY: 0
+        });
+
+        const imgData = canvas.toDataURL("image/png");
+        const imgWidth = canvas.width;
+        const imgHeight = canvas.height;
+        const ratio = Math.min(contentWidth / imgWidth, contentHeight / imgHeight);
+        const renderWidth = imgWidth * ratio;
+        const renderHeight = imgHeight * ratio;
+        const offsetX = margin + (contentWidth - renderWidth) / 2;
+        const offsetY = margin + (contentHeight - renderHeight) / 2;
+
+        if (index > 0) pdf.addPage();
+        pdf.addImage(imgData, "PNG", offsetX, offsetY, renderWidth, renderHeight, undefined, "FAST");
       }
 
-      if (!exported && lastError) throw lastError;
+      pdf.save(fileName);
     } catch (error) {
       console.error("PDF export failed:", error);
       alert("PDF oluşturulamadı. Lütfen sayfayı yenileyip tekrar deneyin.");
