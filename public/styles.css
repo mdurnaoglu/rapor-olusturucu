@@ -851,7 +851,19 @@ textarea {
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(17, 34, 57, 0.06);
   width: 794px;
+  height: 1123px;
   min-height: 1123px;
+  position: relative;
+}
+
+.pdf-page-inner {
+  width: 100%;
+  min-height: 100%;
+}
+
+.pdf-page.is-scaled .pdf-page-inner {
+  transform: scale(var(--page-scale, 1));
+  transform-origin: top left;
 }
 
 .cover {
@@ -1264,6 +1276,8 @@ textarea {
 
 @media print {
   .pdf-page {
+    height: 297mm;
+    min-height: 297mm;
     page-break-after: always;
     break-after: page;
     box-shadow: none;

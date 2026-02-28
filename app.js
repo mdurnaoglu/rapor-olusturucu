@@ -1614,6 +1614,30 @@ function chunkArray(items, chunkSize) {
   return chunks;
 }
 
+const A4_PAGE_HEIGHT_PX = 1123;
+
+function fitReportPagesToA4(root) {
+  if (!root) return;
+  const pages = [...root.querySelectorAll(".pdf-page")];
+  pages.forEach((page) => {
+    if (!(page instanceof HTMLElement)) return;
+    const inner = page.querySelector(".pdf-page-inner");
+    if (!(inner instanceof HTMLElement)) return;
+
+    page.classList.remove("is-scaled");
+    page.style.removeProperty("--page-scale");
+    inner.style.removeProperty("width");
+
+    const contentHeight = inner.scrollHeight;
+    if (!Number.isFinite(contentHeight) || contentHeight <= A4_PAGE_HEIGHT_PX) return;
+
+    const scale = A4_PAGE_HEIGHT_PX / contentHeight;
+    page.classList.add("is-scaled");
+    page.style.setProperty("--page-scale", String(scale));
+    inner.style.width = `${(100 / scale).toFixed(4)}%`;
+  });
+}
+
 function renderPreview(data) {
   const lang = data.report_language === "en" ? "en" : "tr";
   const theme = getThemeTokens(data);
@@ -1645,29 +1669,31 @@ function renderPreview(data) {
 
   const coverPage = `
     <article class="pdf-page" style="--page-bg:${theme.pageBg};--page-text:${theme.textColor};--card-bg:${theme.cardBg};--card-line:${theme.cardBorder};--muted:${theme.muted};--accent:${theme.accentColor};">
-      <section class="cover" style="background:${coverBackground};color:${theme.headingColor};--cover-h1:${theme.h1}px;--cover-h2:${theme.h2}px;">
-        <div class="logo-slot logo-left">
-          <div class="logo-box">${data.agency_logo ? `<img src="${data.agency_logo}" alt="Ajans logosu" />` : `<span>${escapeHtml(data.agency_name || "Ajans")}</span>`}</div>
-        </div>
-        <div class="logo-slot logo-right">
-          <div class="logo-box">${data.client_logo ? `<img src="${data.client_logo}" alt="Müşteri logosu" />` : `<span>${escapeHtml(data.client_name || "Müşteri")}</span>`}</div>
-        </div>
+      <div class="pdf-page-inner">
+        <section class="cover" style="background:${coverBackground};color:${theme.headingColor};--cover-h1:${theme.h1}px;--cover-h2:${theme.h2}px;">
+          <div class="logo-slot logo-left">
+            <div class="logo-box">${data.agency_logo ? `<img src="${data.agency_logo}" alt="Ajans logosu" />` : `<span>${escapeHtml(data.agency_name || "Ajans")}</span>`}</div>
+          </div>
+          <div class="logo-slot logo-right">
+            <div class="logo-box">${data.client_logo ? `<img src="${data.client_logo}" alt="Müşteri logosu" />` : `<span>${escapeHtml(data.client_name || "Müşteri")}</span>`}</div>
+          </div>
 
-        <div class="cover-top-tags">
-          <span>${text("language", lang)}: ${lang === "en" ? "English" : "Türkçe"}</span>
-          <span>${text("currency", lang)}: ${escapeHtml(data.currency || "TRY")}</span>
-        </div>
+          <div class="cover-top-tags">
+            <span>${text("language", lang)}: ${lang === "en" ? "English" : "Türkçe"}</span>
+            <span>${text("currency", lang)}: ${escapeHtml(data.currency || "TRY")}</span>
+          </div>
 
-        <div class="cover-content">
-          <p class="eyebrow">${text("cover_label", lang)}</p>
-          <h1>${escapeHtml(data.report_title || "-")}</h1>
-          <h2>${escapeHtml(data.client_name || "-")}</h2>
-          <p class="period">${text("report_period", lang)}: ${escapeHtml(data.report_period || "-")}</p>
+          <div class="cover-content">
+            <p class="eyebrow">${text("cover_label", lang)}</p>
+            <h1>${escapeHtml(data.report_title || "-")}</h1>
+            <h2>${escapeHtml(data.client_name || "-")}</h2>
+            <p class="period">${text("report_period", lang)}: ${escapeHtml(data.report_period || "-")}</p>
 
-          <div class="cover-chip-row">${typeBadges}</div>
-          <p class="cover-goals">${text("goals", lang)}: ${escapeHtml(goalsText)}</p>
-        </div>
-      </section>
+            <div class="cover-chip-row">${typeBadges}</div>
+            <p class="cover-goals">${text("goals", lang)}: ${escapeHtml(goalsText)}</p>
+          </div>
+        </section>
+      </div>
     </article>
   `;
 
@@ -1679,7 +1705,9 @@ function renderPreview(data) {
             .join("");
           return `
             <article class="pdf-page" style="--page-bg:${theme.pageBg};--page-text:${theme.textColor};--card-bg:${theme.cardBg};--card-line:${theme.cardBorder};--muted:${theme.muted};--accent:${theme.accentColor};">
-              ${sections}
+              <div class="pdf-page-inner">
+                ${sections}
+              </div>
             </article>
           `;
         })
@@ -1692,6 +1720,19 @@ function renderPreview(data) {
       ${pages}
     </div>
   `;
+
+  const reportStack = previewContainer.querySelector(".report-stack");
+  if (reportStack instanceof HTMLElement) {
+    fitReportPagesToA4(reportStack);
+    requestAnimationFrame(() => {
+      if (reportStack.isConnected) fitReportPagesToA4(reportStack);
+    });
+    if (document.fonts && typeof document.fonts.ready?.then === "function") {
+      document.fonts.ready.then(() => {
+        if (reportStack.isConnected) fitReportPagesToA4(reportStack);
+      });
+    }
+  }
 }
 
 function renderLivePreview() {
@@ -1796,7 +1837,9 @@ function openPrintFallback(printable, fileName) {
       .report-stack { gap: 0 !important; width: 210mm !important; min-width: 210mm !important; margin: 0 auto !important; }
       .pdf-page {
         width: 210mm !important;
+        height: 297mm !important;
         min-height: 297mm !important;
+        overflow: hidden !important;
         box-shadow: none !important;
         border: none !important;
         border-radius: 0 !important;
@@ -2019,6 +2062,7 @@ function initPdfExport() {
     try {
       pdfSandbox = createPdfSandbox(printable);
       const sourceNode = pdfSandbox.clone;
+      fitReportPagesToA4(sourceNode);
       await waitForRenderableAssets(sourceNode);
 
       const scales = [1.6, 1.2, 0.9];
