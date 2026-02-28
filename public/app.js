@@ -1895,23 +1895,45 @@ function initPdfExport() {
 
     const fileName = `${(form.client_name.value || "rapor").replace(/\s+/g, "_")}_rapor.pdf`;
 
-    try {
-      await waitForRenderableAssets(printable);
-
-      await window
+    const exportWithScale = (scale) =>
+      window
         .html2pdf()
         .set({
           margin: 8,
           filename: fileName,
           image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 },
-          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+          html2canvas: {
+            scale,
+            useCORS: true,
+            allowTaint: true,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: printable.scrollWidth
+          },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+          pagebreak: { mode: ["css", "legacy"] }
         })
         .from(printable)
         .save();
+
+    const originalButtonText = downloadPdfBtn.textContent;
+    downloadPdfBtn.disabled = true;
+    downloadPdfBtn.textContent = getCurrentLang() === "en" ? "Preparing PDF..." : "PDF hazırlanıyor...";
+
+    try {
+      await waitForRenderableAssets(printable);
+      await exportWithScale(2);
     } catch (error) {
-      console.error("PDF export failed:", error);
-      alert("PDF oluşturulamadı. Lütfen sayfayı yenileyip tekrar deneyin.");
+      try {
+        console.warn("PDF export retrying with reduced scale:", error);
+        await exportWithScale(1.35);
+      } catch (retryError) {
+        console.error("PDF export failed:", retryError);
+        alert("PDF oluşturulamadı. Lütfen sayfayı yenileyip tekrar deneyin.");
+      }
+    } finally {
+      downloadPdfBtn.disabled = false;
+      downloadPdfBtn.textContent = originalButtonText;
     }
   });
 }
