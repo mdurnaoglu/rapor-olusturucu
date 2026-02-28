@@ -966,6 +966,11 @@ textarea {
   font-size: 12px;
 }
 
+.cover-chip-row span.module-chip {
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.22);
+}
+
 .page-head {
   background: linear-gradient(90deg, var(--accent, #0e2943), rgba(30, 106, 170, 0.88));
   color: #fff;

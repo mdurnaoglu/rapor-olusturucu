@@ -1479,9 +1479,16 @@ function renderPreview(data) {
     ? goals.map((goal) => GOAL_LABELS[goal]?.[lang] || goal).join(" • ")
     : "-";
 
-  const typeBadges = reportTypes.length
+  const reportTypeBadges = reportTypes.length
     ? reportTypes.map((typeId) => `<span>${escapeHtml(reportTypeLabel(typeId, lang))}</span>`).join("")
-    : `<span>-</span>`;
+    : "";
+
+  const customModuleBadges =
+    reportTypes.includes("custom") && (data.customModules || []).length
+      ? data.customModules.map((module) => `<span class="module-chip">${escapeHtml(module)}</span>`).join("")
+      : "";
+
+  const typeBadges = reportTypeBadges || customModuleBadges ? `${reportTypeBadges}${customModuleBadges}` : `<span>-</span>`;
 
   const coverBackground = buildCoverBackground(theme);
 
