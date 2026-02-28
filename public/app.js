@@ -461,6 +461,35 @@ function getLocale(lang) {
   return lang === "en" ? "en-US" : "tr-TR";
 }
 
+function getDateRangeErrorMessage() {
+  return getCurrentLang() === "en"
+    ? "Start date cannot be later than end date."
+    : "Başlangıç tarihi, bitiş tarihinden daha sonra olamaz.";
+}
+
+function validateDateRange({ showMessage = false } = {}) {
+  const startInput = form.report_start_date;
+  const endInput = form.report_end_date;
+  if (!(startInput instanceof HTMLInputElement) || !(endInput instanceof HTMLInputElement)) return true;
+
+  const startValue = startInput.value;
+  const endValue = endInput.value;
+
+  startInput.max = endValue || "";
+  endInput.min = startValue || "";
+
+  const invalidRange = Boolean(startValue && endValue && startValue > endValue);
+  const validationMessage = invalidRange ? getDateRangeErrorMessage() : "";
+  startInput.setCustomValidity(validationMessage);
+  endInput.setCustomValidity(validationMessage);
+
+  if (showMessage && invalidRange) {
+    endInput.reportValidity();
+  }
+
+  return !invalidRange;
+}
+
 function normalizeHexColor(value) {
   const stripped = String(value || "")
     .trim()
@@ -1276,6 +1305,12 @@ function renderDynamicFields() {
 }
 
 function syncPeriodField() {
+  const isDateRangeValid = validateDateRange();
+  if (!isDateRangeValid) {
+    form.report_period.value = "-";
+    return;
+  }
+
   const lang = getCurrentLang();
   const period = buildReportPeriod(form.report_start_date.value, form.report_end_date.value, lang);
   form.report_period.value = period;
@@ -1743,6 +1778,7 @@ function bindStep1Events() {
   });
 
   form.report_language.addEventListener("change", () => {
+    validateDateRange();
     renderDynamicFields();
     scheduleLivePreview();
   });
@@ -1799,6 +1835,7 @@ function initStepControls() {
   });
 
   nextBtn.addEventListener("click", () => {
+    if (state.currentStep === 1 && !validateDateRange({ showMessage: true })) return;
     if (state.currentStep < 3) {
       state.currentStep += 1;
       updateStepUI();
@@ -1806,12 +1843,15 @@ function initStepControls() {
   });
 
   previewBtn.addEventListener("click", () => {
+    if (!validateDateRange({ showMessage: true })) return;
     renderLivePreview();
   });
 }
 
 function initPdfExport() {
   downloadPdfBtn.addEventListener("click", async () => {
+    if (!validateDateRange({ showMessage: true })) return;
+
     const printable = previewContainer.querySelector(".report-stack");
     if (!printable) {
       alert(text("preview_first", getCurrentLang()));
@@ -1856,6 +1896,7 @@ function bootstrap() {
   updateStep1ConditionalBlocks();
   renderCustomModuleChips();
   bindColorHexInputs();
+  validateDateRange();
   applyThemePreset("theme_1", false);
   renderDynamicFields();
   syncPeriodField();
