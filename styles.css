@@ -835,7 +835,7 @@ textarea {
   min-height: 310px;
   position: relative;
   overflow: hidden;
-  padding: 26px;
+  padding: 20px 26px 26px;
   display: grid;
   gap: 8px;
 }
@@ -889,7 +889,7 @@ textarea {
 
 .cover-top-tags {
   position: absolute;
-  top: 92px;
+  top: 96px;
   right: 16px;
   display: flex;
   gap: 8px;
@@ -913,8 +913,17 @@ textarea {
   z-index: 2;
 }
 
+.cover-content {
+  position: relative;
+  z-index: 2;
+  margin-top: 94px;
+  max-width: calc(100% - 210px);
+  display: grid;
+  gap: 6px;
+}
+
 .eyebrow {
-  margin-top: 84px;
+  margin-top: 0;
   text-transform: uppercase;
   font-size: 12px;
   opacity: 0.9;
@@ -924,11 +933,15 @@ textarea {
 .cover h1 {
   font-size: var(--cover-h1, 52px);
   font-weight: 700;
+  line-height: 1.05;
+  max-width: 16ch;
 }
 
 .cover h2 {
   font-size: var(--cover-h2, 32px);
   font-weight: 700;
+  line-height: 1.08;
+  max-width: 18ch;
 }
 
 .period,
@@ -1191,6 +1204,11 @@ textarea {
     right: 0;
     margin-top: 8px;
     margin-bottom: 8px;
+  }
+
+  .cover-content {
+    margin-top: 0;
+    max-width: 100%;
   }
 
   .eyebrow {

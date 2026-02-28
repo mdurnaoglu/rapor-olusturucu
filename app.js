@@ -1492,13 +1492,15 @@ function renderPreview(data) {
           <span>${text("currency", lang)}: ${escapeHtml(data.currency || "TRY")}</span>
         </div>
 
-        <p class="eyebrow">${text("cover_label", lang)}</p>
-        <h1>${escapeHtml(data.report_title || "-")}</h1>
-        <h2>${escapeHtml(data.client_name || "-")}</h2>
-        <p class="period">${text("report_period", lang)}: ${escapeHtml(data.report_period || "-")}</p>
+        <div class="cover-content">
+          <p class="eyebrow">${text("cover_label", lang)}</p>
+          <h1>${escapeHtml(data.report_title || "-")}</h1>
+          <h2>${escapeHtml(data.client_name || "-")}</h2>
+          <p class="period">${text("report_period", lang)}: ${escapeHtml(data.report_period || "-")}</p>
 
-        <div class="cover-chip-row">${typeBadges}</div>
-        <p class="cover-goals">${text("goals", lang)}: ${escapeHtml(goalsText)}</p>
+          <div class="cover-chip-row">${typeBadges}</div>
+          <p class="cover-goals">${text("goals", lang)}: ${escapeHtml(goalsText)}</p>
+        </div>
       </section>
     </article>
   `;
@@ -1704,20 +1706,31 @@ function initPdfExport() {
       return;
     }
 
+    if (typeof window.html2pdf !== "function") {
+      alert("PDF kütüphanesi yüklenemedi. Sayfayı yenileyip tekrar deneyin.");
+      return;
+    }
+
     const fileName = `${(form.client_name.value || "rapor").replace(/\s+/g, "_")}_rapor.pdf`;
 
-    await waitForRenderableAssets(printable);
+    try {
+      await waitForRenderableAssets(printable);
 
-    html2pdf()
-      .set({
-        margin: 8,
-        filename: fileName,
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
-      })
-      .from(printable)
-      .save();
+      await window
+        .html2pdf()
+        .set({
+          margin: 8,
+          filename: fileName,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+        })
+        .from(printable)
+        .save();
+    } catch (error) {
+      console.error("PDF export failed:", error);
+      alert("PDF oluşturulamadı. Lütfen sayfayı yenileyip tekrar deneyin.");
+    }
   });
 }
 
