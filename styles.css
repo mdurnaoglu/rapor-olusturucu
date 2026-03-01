@@ -64,6 +64,39 @@ body {
   letter-spacing: var(--tracking-tight);
 }
 
+.mode-switch {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 auto 14px;
+  width: min(680px, 100%);
+}
+
+.mode-tab {
+  border: 1px solid #c7d6e8;
+  background: #fff;
+  color: #15396d;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mode-tab.active {
+  background: #163b6f;
+  border-color: #163b6f;
+  color: #fff;
+}
+
+.report-mode-panel {
+  display: none;
+}
+
+.report-mode-panel.active {
+  display: block;
+}
+
 .workspace {
   display: grid;
   grid-template-columns: minmax(480px, 1fr) minmax(860px, 860px);
@@ -170,6 +203,11 @@ h3 {
   margin: 0 0 12px;
   font-size: 14px;
   color: #60748d;
+}
+
+.detailed-wizard {
+  display: grid;
+  gap: 12px;
 }
 
 .field-group {
@@ -832,6 +870,79 @@ textarea {
   overflow: auto;
 }
 
+.csv-report-preview {
+  background: #f9fbff;
+}
+
+.csv-report-shell {
+  display: grid;
+  gap: 12px;
+}
+
+.csv-section {
+  border: 1px solid #d6e1ed;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.csv-section-head {
+  padding: 12px 14px;
+  background: linear-gradient(90deg, #163b6f, #2a63a7);
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.csv-section-head h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.csv-section-head span {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.csv-widget-grid {
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.csv-widget {
+  border: 1px solid #d3deea;
+  border-left: 5px solid #1f4d96;
+  border-radius: 10px;
+  padding: 10px;
+  background: #ffffff;
+  display: grid;
+  gap: 4px;
+}
+
+.csv-widget h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #546a83;
+}
+
+.csv-widget p {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 700;
+  color: #162c48;
+}
+
+.csv-empty {
+  padding: 16px 12px;
+  margin: 0;
+  color: #60758f;
+}
+
 .report-stack {
   display: grid;
   gap: 16px;
@@ -1250,6 +1361,10 @@ textarea {
     padding: 18px 14px 28px;
   }
 
+  .mode-switch {
+    grid-template-columns: 1fr;
+  }
+
   .grid.two,
   .settings-grid,
   .kpi-input-row-grid,
@@ -1299,6 +1414,10 @@ textarea {
 
   .cover-top-tags {
     justify-content: flex-start;
+  }
+
+  .csv-widget-grid {
+    grid-template-columns: 1fr;
   }
 }
 

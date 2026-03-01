@@ -403,6 +403,9 @@ const SIZE_SCALE = {
 };
 
 const form = document.getElementById("reportForm");
+const modeTabs = [...document.querySelectorAll("[data-mode-tab]")];
+const quickModePanel = document.getElementById("quickModePanel");
+const detailedModePanel = document.getElementById("detailedModePanel");
 const stepButtons = [...document.querySelectorAll(".step")];
 const stepPanels = [...document.querySelectorAll(".step-panel")];
 const prevBtn = document.getElementById("prevBtn");
@@ -417,6 +420,11 @@ const customModuleBlock = document.getElementById("customModuleBlock");
 const customModuleInput = document.getElementById("customModuleInput");
 const addCustomModuleBtn = document.getElementById("addCustomModuleBtn");
 const customModuleList = document.getElementById("customModuleList");
+const metaCsvInput = document.getElementById("metaCsvInput");
+const googleCsvInput = document.getElementById("googleCsvInput");
+const metaCsvStatus = document.getElementById("metaCsvStatus");
+const googleCsvStatus = document.getElementById("googleCsvStatus");
+const detailedReportPreview = document.getElementById("detailedReportPreview");
 const colorHexInputMap = new Map(
   [...document.querySelectorAll("[data-hex-for]")]
     .filter((input) => input instanceof HTMLInputElement && input.dataset.hexFor)
@@ -424,6 +432,7 @@ const colorHexInputMap = new Map(
 );
 
 const state = {
+  currentMode: "quick",
   currentStep: 1,
   selectedReportTypes: new Set(["meta", "google_ads"]),
   selectedSocialPlatforms: new Set(["instagram"]),
@@ -436,6 +445,10 @@ const state = {
   reportImageByType: {},
   creativeByType: {},
   logoState: { agency_logo: "", client_logo: "" },
+  detailedCsv: {
+    meta: { fileName: "", widgets: [] },
+    google: { fileName: "", widgets: [] }
+  },
   previewDebounce: null,
   customKpiSeq: 1
 };
@@ -459,6 +472,84 @@ function getCurrentLang() {
 
 function getLocale(lang) {
   return lang === "en" ? "en-US" : "tr-TR";
+}
+
+function parseCsvLine(line, delimiter) {
+  const cells = [];
+  let cell = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const nextChar = line[index + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        cell += '"';
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (!inQuotes && char === delimiter) {
+      cells.push(cell.trim());
+      cell = "";
+      continue;
+    }
+
+    cell += char;
+  }
+
+  cells.push(cell.trim());
+  return cells;
+}
+
+function parseCsvText(csvText) {
+  const normalized = String(csvText || "")
+    .replace(/^\uFEFF/, "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .trim();
+  if (!normalized) return [];
+
+  const lines = normalized.split("\n").filter((line) => line.trim().length);
+  if (!lines.length) return [];
+
+  const firstLine = lines[0];
+  const semicolonCount = (firstLine.match(/;/g) || []).length;
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  const delimiter = semicolonCount > commaCount ? ";" : ",";
+
+  return lines.map((line) => parseCsvLine(line, delimiter));
+}
+
+function isFilledCsvValue(value) {
+  return String(value ?? "").trim() !== "";
+}
+
+function extractCsvWidgets(rows) {
+  if (!rows.length) return [];
+  const headers = rows[0] || [];
+  if (!headers.length) return [];
+
+  const dataRows = rows.slice(1).filter((row) => row.some((cell) => isFilledCsvValue(cell)));
+  if (!dataRows.length) return [];
+
+  const bestRow = dataRows.reduce((best, row) => {
+    const score = headers.reduce((count, _header, index) => (isFilledCsvValue(row[index]) ? count + 1 : count), 0);
+    return score > best.score ? { row, score } : best;
+  }, { row: dataRows[0], score: 0 }).row;
+
+  const widgets = [];
+  headers.forEach((header, index) => {
+    const title = String(header || "").trim();
+    const value = String(bestRow[index] ?? "").trim();
+    if (!title || !isFilledCsvValue(value)) return;
+    widgets.push({ title, value });
+  });
+  return widgets;
 }
 
 function getDateRangeErrorMessage() {
@@ -1806,12 +1897,70 @@ function scheduleLivePreview() {
   }, 120);
 }
 
+function setReportMode(mode) {
+  state.currentMode = mode === "detailed" ? "detailed" : "quick";
+  modeTabs.forEach((button) => {
+    button.classList.toggle("active", button.getAttribute("data-mode-tab") === state.currentMode);
+  });
+  if (quickModePanel) quickModePanel.classList.toggle("active", state.currentMode === "quick");
+  if (detailedModePanel) detailedModePanel.classList.toggle("active", state.currentMode === "detailed");
+}
+
+function renderCsvSection(title, fileName, widgets) {
+  const content = widgets.length
+    ? `
+      <div class="csv-widget-grid">
+        ${widgets
+          .map(
+            (widget) => `
+              <article class="csv-widget">
+                <h4>${escapeHtml(widget.title)}</h4>
+                <p>${escapeHtml(widget.value)}</p>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+    `
+    : `<p class="csv-empty">Henüz veri yok. CSV dosyası yükleyin.</p>`;
+
+  return `
+    <section class="csv-section">
+      <header class="csv-section-head">
+        <h3>${escapeHtml(title)}</h3>
+        <span>${escapeHtml(fileName || "Dosya yüklenmedi")}</span>
+      </header>
+      ${content}
+    </section>
+  `;
+}
+
+function renderDetailedPreview() {
+  if (!detailedReportPreview) return;
+  const { meta, google } = state.detailedCsv;
+  detailedReportPreview.innerHTML = `
+    <div class="csv-report-shell">
+      ${renderCsvSection("Meta", meta.fileName, meta.widgets)}
+      ${renderCsvSection("Google Ads", google.fileName, google.widgets)}
+    </div>
+  `;
+}
+
 async function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
     reader.onerror = reject;
     reader.readAsDataURL(file);
+  });
+}
+
+async function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = reject;
+    reader.readAsText(file);
   });
 }
 
@@ -1954,6 +2103,46 @@ function bindThemeEvents() {
   });
 }
 
+function initModeTabs() {
+  modeTabs.forEach((button) => {
+    button.addEventListener("click", () => {
+      setReportMode(button.getAttribute("data-mode-tab") || "quick");
+    });
+  });
+}
+
+function initDetailedCsvUploader() {
+  const bindCsvInput = (input, statusEl, channel) => {
+    if (!(input instanceof HTMLInputElement) || !statusEl) return;
+
+    input.addEventListener("change", async () => {
+      const file = input.files?.[0];
+      if (!file) {
+        state.detailedCsv[channel] = { fileName: "", widgets: [] };
+        statusEl.textContent = "Henüz dosya yüklenmedi.";
+        renderDetailedPreview();
+        return;
+      }
+
+      try {
+        const content = await readFileAsText(file);
+        const rows = parseCsvText(content);
+        const widgets = extractCsvWidgets(rows);
+        state.detailedCsv[channel] = { fileName: file.name, widgets };
+        statusEl.textContent = `${file.name} yüklendi (${widgets.length} alan).`;
+      } catch (error) {
+        console.error(`CSV parse failed for ${channel}:`, error);
+        state.detailedCsv[channel] = { fileName: file.name, widgets: [] };
+        statusEl.textContent = "Dosya okunamadı. Lütfen geçerli bir CSV yükleyin.";
+      }
+      renderDetailedPreview();
+    });
+  };
+
+  bindCsvInput(metaCsvInput, metaCsvStatus, "meta");
+  bindCsvInput(googleCsvInput, googleCsvStatus, "google");
+}
+
 function bindGenericLiveEvents() {
   form.addEventListener("input", (event) => {
     const target = event.target;
@@ -2087,6 +2276,7 @@ function initLogos() {
 }
 
 function bootstrap() {
+  setReportMode("quick");
   syncStateFromStep1();
   updateStep1ConditionalBlocks();
   renderCustomModuleChips();
@@ -2099,12 +2289,15 @@ function bootstrap() {
 
   bindStep1Events();
   bindThemeEvents();
+  initModeTabs();
+  initDetailedCsvUploader();
   bindGenericLiveEvents();
   initStepControls();
   initPdfExport();
   initLogos();
 
   renderLivePreview();
+  renderDetailedPreview();
 }
 
 bootstrap();

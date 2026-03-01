@@ -22,9 +22,15 @@
         <p>Pratik ve Profesyonel Raporlama</p>
       </header>
 
-      <section class="workspace">
-        <div class="builder-pane">
-          <section class="wizard" id="wizard">
+      <nav class="mode-switch" id="reportModeSwitch">
+        <button class="mode-tab active" type="button" data-mode-tab="quick">Hızlı Rapor Oluştur</button>
+        <button class="mode-tab" type="button" data-mode-tab="detailed">Detaylı Rapor Oluştur</button>
+      </nav>
+
+      <section id="quickModePanel" class="report-mode-panel active">
+        <section class="workspace">
+          <div class="builder-pane">
+            <section class="wizard" id="wizard">
             <div class="steps">
               <button class="step active" data-step="1" type="button">Rapor Yapısı</button>
               <button class="step" data-step="2" type="button">Tema ve Tasarım</button>
@@ -275,16 +281,47 @@
                 <button type="button" id="nextBtn">İleri</button>
                 <button type="button" id="previewBtn">Önizlemeyi Yenile</button>
               </div>
-            </form>
-          </section>
-        </div>
-
-        <section class="preview-wrapper">
-          <div class="preview-header">
-            <h2>Rapor Önizleme</h2>
-            <button id="downloadPdfBtn" type="button">PDF Olarak İndir</button>
+              </form>
+            </section>
           </div>
-          <article id="reportPreview" class="report-preview"></article>
+
+          <section class="preview-wrapper">
+            <div class="preview-header">
+              <h2>Rapor Önizleme</h2>
+              <button id="downloadPdfBtn" type="button">PDF Olarak İndir</button>
+            </div>
+            <article id="reportPreview" class="report-preview"></article>
+          </section>
+        </section>
+      </section>
+
+      <section id="detailedModePanel" class="report-mode-panel">
+        <section class="workspace">
+          <div class="builder-pane">
+            <section class="wizard detailed-wizard">
+              <h2>Detaylı Rapor Oluştur</h2>
+              <p class="hint">CSV dosyası yüklediğinde, boş olmayan sütunlar otomatik olarak widget şeklinde rapora eklenir.</p>
+
+              <div class="sub-block">
+                <p class="field-title">Meta CSV Yükle</p>
+                <input id="metaCsvInput" type="file" accept=".csv,text/csv" />
+                <p id="metaCsvStatus" class="inline-note">Henüz dosya yüklenmedi.</p>
+              </div>
+
+              <div class="sub-block">
+                <p class="field-title">Google CSV Yükle</p>
+                <input id="googleCsvInput" type="file" accept=".csv,text/csv" />
+                <p id="googleCsvStatus" class="inline-note">Henüz dosya yüklenmedi.</p>
+              </div>
+            </section>
+          </div>
+
+          <section class="preview-wrapper">
+            <div class="preview-header">
+              <h2>Detaylı Rapor Önizleme</h2>
+            </div>
+            <article id="detailedReportPreview" class="report-preview csv-report-preview"></article>
+          </section>
         </section>
       </section>
     </main>
