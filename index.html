@@ -302,6 +302,83 @@
               <h2>Detaylı Rapor Oluştur</h2>
               <p class="hint">CSV dosyası yüklediğinde, boş olmayan sütunlar otomatik olarak widget şeklinde rapora eklenir.</p>
 
+              <div class="grid two">
+                <label>
+                  <span class="field-label">Rapor Başlığı</span>
+                  <input id="detailedReportTitle" type="text" value="Detaylı Performans Raporu" />
+                </label>
+                <label>
+                  <span class="field-label">Rapor Dili</span>
+                  <select id="detailedReportLanguage">
+                    <option value="tr" selected>Türkçe</option>
+                    <option value="en">English</option>
+                  </select>
+                </label>
+                <label>
+                  <span class="field-label">Başlangıç Tarihi</span>
+                  <input id="detailedStartDate" type="date" />
+                </label>
+                <label>
+                  <span class="field-label">Bitiş Tarihi</span>
+                  <input id="detailedEndDate" type="date" />
+                </label>
+                <label>
+                  <span class="field-label">Müşteri Adı</span>
+                  <input id="detailedClientName" type="text" placeholder="Müşteri Adı" />
+                </label>
+                <label>
+                  <span class="field-label">Ajans Adı</span>
+                  <input id="detailedAgencyName" type="text" placeholder="Ajans Adı" />
+                </label>
+                <label>
+                  <span class="field-label">Ajans Logosu</span>
+                  <input id="detailedAgencyLogo" type="file" accept="image/*" />
+                </label>
+                <label>
+                  <span class="field-label">Müşteri Logosu</span>
+                  <input id="detailedClientLogo" type="file" accept="image/*" />
+                </label>
+              </div>
+
+              <div class="grid two">
+                <label>
+                  <span class="field-label">Kapak Rengi</span>
+                  <input id="detailedCoverColor" type="color" value="#0e2943" />
+                </label>
+                <label>
+                  <span class="field-label">Metin Rengi</span>
+                  <input id="detailedTextColor" type="color" value="#102437" />
+                </label>
+                <label>
+                  <span class="field-label">Başlık Rengi</span>
+                  <input id="detailedHeadingColor" type="color" value="#ffffff" />
+                </label>
+                <label>
+                  <span class="field-label">Vurgu Rengi</span>
+                  <input id="detailedAccentColor" type="color" value="#1d6fa3" />
+                </label>
+                <label class="switch-label">
+                  <span class="field-label">Gradient Aç/Kapat</span>
+                  <input id="detailedGradientEnabled" type="checkbox" checked />
+                </label>
+                <label>
+                  <span class="field-label">Gradient Yönü</span>
+                  <select id="detailedGradientDirection">
+                    <option value="horizontal">Horizontal</option>
+                    <option value="vertical">Vertical</option>
+                    <option value="diagonal" selected>Diagonal</option>
+                  </select>
+                </label>
+                <label>
+                  <span class="field-label">Gradient Renk 1</span>
+                  <input id="detailedGradientColor1" type="color" value="#1d4fa8" />
+                </label>
+                <label>
+                  <span class="field-label">Gradient Renk 2</span>
+                  <input id="detailedGradientColor2" type="color" value="#071934" />
+                </label>
+              </div>
+
               <div class="sub-block">
                 <p class="field-title">Meta CSV Yükle</p>
                 <input id="metaCsvInput" type="file" accept=".csv,text/csv" />
@@ -319,6 +396,7 @@
           <section class="preview-wrapper">
             <div class="preview-header">
               <h2>Detaylı Rapor Önizleme</h2>
+              <button id="detailedDownloadPdfBtn" type="button">PDF Olarak İndir</button>
             </div>
             <article id="detailedReportPreview" class="report-preview csv-report-preview"></article>
           </section>

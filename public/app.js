@@ -425,6 +425,23 @@ const googleCsvInput = document.getElementById("googleCsvInput");
 const metaCsvStatus = document.getElementById("metaCsvStatus");
 const googleCsvStatus = document.getElementById("googleCsvStatus");
 const detailedReportPreview = document.getElementById("detailedReportPreview");
+const detailedDownloadPdfBtn = document.getElementById("detailedDownloadPdfBtn");
+const detailedReportTitle = document.getElementById("detailedReportTitle");
+const detailedReportLanguage = document.getElementById("detailedReportLanguage");
+const detailedStartDate = document.getElementById("detailedStartDate");
+const detailedEndDate = document.getElementById("detailedEndDate");
+const detailedClientName = document.getElementById("detailedClientName");
+const detailedAgencyName = document.getElementById("detailedAgencyName");
+const detailedAgencyLogo = document.getElementById("detailedAgencyLogo");
+const detailedClientLogo = document.getElementById("detailedClientLogo");
+const detailedCoverColor = document.getElementById("detailedCoverColor");
+const detailedTextColor = document.getElementById("detailedTextColor");
+const detailedHeadingColor = document.getElementById("detailedHeadingColor");
+const detailedAccentColor = document.getElementById("detailedAccentColor");
+const detailedGradientEnabled = document.getElementById("detailedGradientEnabled");
+const detailedGradientDirection = document.getElementById("detailedGradientDirection");
+const detailedGradientColor1 = document.getElementById("detailedGradientColor1");
+const detailedGradientColor2 = document.getElementById("detailedGradientColor2");
 const colorHexInputMap = new Map(
   [...document.querySelectorAll("[data-hex-for]")]
     .filter((input) => input instanceof HTMLInputElement && input.dataset.hexFor)
@@ -449,6 +466,7 @@ const state = {
     meta: { fileName: "", widgets: [] },
     google: { fileName: "", widgets: [] }
   },
+  detailedLogoState: { agency_logo: "", client_logo: "" },
   previewDebounce: null,
   customKpiSeq: 1
 };
@@ -529,6 +547,14 @@ function isFilledCsvValue(value) {
   return String(value ?? "").trim() !== "";
 }
 
+function isRenderableCsvValue(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return false;
+  const parsed = parseLooseNumber(raw);
+  if (Number.isFinite(parsed) && parsed === 0) return false;
+  return true;
+}
+
 function extractCsvWidgets(rows) {
   if (!rows.length) return [];
   const headers = rows[0] || [];
@@ -546,7 +572,7 @@ function extractCsvWidgets(rows) {
   headers.forEach((header, index) => {
     const title = String(header || "").trim();
     const value = String(bestRow[index] ?? "").trim();
-    if (!title || !isFilledCsvValue(value)) return;
+    if (!title || !isRenderableCsvValue(value)) return;
     widgets.push({ title, value });
   });
   return widgets;
@@ -1906,42 +1932,111 @@ function setReportMode(mode) {
   if (detailedModePanel) detailedModePanel.classList.toggle("active", state.currentMode === "detailed");
 }
 
-function renderCsvSection(title, fileName, widgets) {
-  const content = widgets.length
-    ? `
-      <div class="csv-widget-grid">
-        ${widgets
-          .map(
-            (widget) => `
-              <article class="csv-widget">
-                <h4>${escapeHtml(widget.title)}</h4>
-                <p>${escapeHtml(widget.value)}</p>
-              </article>
-            `
-          )
-          .join("")}
-      </div>
-    `
-    : `<p class="csv-empty">Henüz veri yok. CSV dosyası yükleyin.</p>`;
-
-  return `
-    <section class="csv-section">
-      <header class="csv-section-head">
-        <h3>${escapeHtml(title)}</h3>
-        <span>${escapeHtml(fileName || "Dosya yüklenmedi")}</span>
-      </header>
-      ${content}
-    </section>
-  `;
-}
-
 function renderDetailedPreview() {
   if (!detailedReportPreview) return;
-  const { meta, google } = state.detailedCsv;
+
+  const lang = detailedReportLanguage?.value === "en" ? "en" : "tr";
+  const reportTitle = detailedReportTitle?.value?.trim() || (lang === "en" ? "Detailed Performance Report" : "Detaylı Performans Raporu");
+  const clientName = detailedClientName?.value?.trim() || "-";
+  const agencyName = detailedAgencyName?.value?.trim() || "-";
+  const startDate = detailedStartDate?.value || "";
+  const endDate = detailedEndDate?.value || "";
+  const reportPeriod = buildReportPeriod(startDate, endDate, lang);
+
+  const theme = {
+    coverColor: detailedCoverColor?.value || "#0e2943",
+    headingColor: detailedHeadingColor?.value || "#ffffff",
+    textColor: detailedTextColor?.value || "#102437",
+    accentColor: detailedAccentColor?.value || "#1d6fa3",
+    gradientEnabled: Boolean(detailedGradientEnabled?.checked),
+    gradientColor1: detailedGradientColor1?.value || "#1d4fa8",
+    gradientColor2: detailedGradientColor2?.value || "#071934",
+    gradientDirection: detailedGradientDirection?.value || "diagonal",
+    pageBg: "#ffffff",
+    cardBg: "#ffffff",
+    cardBorder: "#d7e2ee",
+    muted: "#5e7286",
+    fontFamily: FONT_STACK.Inter,
+    body: SIZE_SCALE.medium.body,
+    h3: SIZE_SCALE.medium.h3,
+    kpi: SIZE_SCALE.medium.kpi,
+    h1: SIZE_SCALE.medium.h1,
+    h2: SIZE_SCALE.medium.h2
+  };
+
+  const coverBackground = buildCoverBackground(theme);
+  const sections = [
+    { id: "meta", label: "META", widgets: state.detailedCsv.meta.widgets, fileName: state.detailedCsv.meta.fileName },
+    { id: "google", label: "Google Ads", widgets: state.detailedCsv.google.widgets, fileName: state.detailedCsv.google.fileName }
+  ].filter((section) => section.widgets.length);
+
+  const coverPage = `
+    <article class="pdf-page" style="--page-bg:${theme.pageBg};--page-text:${theme.textColor};--card-bg:${theme.cardBg};--card-line:${theme.cardBorder};--muted:${theme.muted};--accent:${theme.accentColor};">
+      <div class="pdf-page-inner">
+        <section class="cover" style="background:${coverBackground};color:${theme.headingColor};--cover-h1:${theme.h1}px;--cover-h2:${theme.h2}px;">
+          <div class="cover-brand-row">
+            <div class="logo-box">${state.detailedLogoState.agency_logo ? `<img src="${state.detailedLogoState.agency_logo}" alt="Ajans logosu" />` : `<span>${escapeHtml(agencyName)}</span>`}</div>
+            <div class="logo-box">${state.detailedLogoState.client_logo ? `<img src="${state.detailedLogoState.client_logo}" alt="Müşteri logosu" />` : `<span>${escapeHtml(clientName)}</span>`}</div>
+          </div>
+          <div class="cover-top-tags">
+            <span>${text("language", lang)}: ${lang === "en" ? "English" : "Türkçe"}</span>
+          </div>
+          <div class="cover-content">
+            <p class="eyebrow">${text("cover_label", lang)}</p>
+            <h1>${escapeHtml(reportTitle)}</h1>
+            <h2>${escapeHtml(clientName)}</h2>
+            <p class="period">${text("report_period", lang)}: ${escapeHtml(reportPeriod || "-")}</p>
+          </div>
+        </section>
+      </div>
+    </article>
+  `;
+
+  const pages = sections.length
+    ? chunkArray(sections, 2)
+        .map((pair) => {
+          const blocks = pair
+            .map(
+              (section) => `
+                <section class="type-page-block compact-type-section">
+                  <header class="page-head">
+                    <h2>${escapeHtml(section.label)}</h2>
+                    <p>${escapeHtml(section.fileName || "CSV Yüklendi")}</p>
+                  </header>
+                  <div class="content">
+                    <div class="metric-grid">
+                      ${section.widgets
+                        .map(
+                          (widget) => `
+                            <article class="metric-card">
+                              <span class="metric-label">${escapeHtml(widget.title)}</span>
+                              <strong>${escapeHtml(widget.value)}</strong>
+                            </article>
+                          `
+                        )
+                        .join("")}
+                    </div>
+                  </div>
+                </section>
+              `
+            )
+            .join("");
+
+          return `
+            <article class="pdf-page ${pair.length === 2 ? "pair-page" : "single-page"}" style="--page-bg:${theme.pageBg};--page-text:${theme.textColor};--card-bg:${theme.cardBg};--card-line:${theme.cardBorder};--muted:${theme.muted};--accent:${theme.accentColor};">
+              <div class="pdf-page-inner">
+                ${blocks}
+              </div>
+            </article>
+          `;
+        })
+        .join("")
+    : `<article class="pdf-page"><div class="pdf-page-inner"><section class="content"><p>${text("no_sections", lang)}</p></section></div></article>`;
+
   detailedReportPreview.innerHTML = `
-    <div class="csv-report-shell">
-      ${renderCsvSection("Meta", meta.fileName, meta.widgets)}
-      ${renderCsvSection("Google Ads", google.fileName, google.widgets)}
+    <div class="report-stack" style="--report-font:${theme.fontFamily};--report-body:${theme.body}px;--report-h3:${theme.h3}px;--report-kpi:${theme.kpi}px;--report-accent:${theme.accentColor};--report-text:${theme.textColor};">
+      ${coverPage}
+      ${pages}
     </div>
   `;
 }
@@ -1974,6 +2069,18 @@ async function updateLogoState(event) {
 
   state.logoState[input.name] = await readFileAsDataUrl(input.files[0]);
   scheduleLivePreview();
+}
+
+async function updateDetailedLogoState(input, key) {
+  if (!(input instanceof HTMLInputElement)) return;
+  if (!input.files || !input.files[0]) {
+    state.detailedLogoState[key] = "";
+    renderDetailedPreview();
+    return;
+  }
+
+  state.detailedLogoState[key] = await readFileAsDataUrl(input.files[0]);
+  renderDetailedPreview();
 }
 
 async function waitForRenderableAssets(root) {
@@ -2143,6 +2250,38 @@ function initDetailedCsvUploader() {
   bindCsvInput(googleCsvInput, googleCsvStatus, "google");
 }
 
+function initDetailedFormEvents() {
+  const fields = [
+    detailedReportTitle,
+    detailedReportLanguage,
+    detailedStartDate,
+    detailedEndDate,
+    detailedClientName,
+    detailedAgencyName,
+    detailedCoverColor,
+    detailedTextColor,
+    detailedHeadingColor,
+    detailedAccentColor,
+    detailedGradientEnabled,
+    detailedGradientDirection,
+    detailedGradientColor1,
+    detailedGradientColor2
+  ].filter(Boolean);
+
+  fields.forEach((field) => {
+    const eventName = field instanceof HTMLSelectElement || field instanceof HTMLInputElement && field.type === "checkbox" ? "change" : "input";
+    field.addEventListener(eventName, renderDetailedPreview);
+    if (eventName !== "change") field.addEventListener("change", renderDetailedPreview);
+  });
+
+  if (detailedAgencyLogo instanceof HTMLInputElement) {
+    detailedAgencyLogo.addEventListener("change", () => updateDetailedLogoState(detailedAgencyLogo, "agency_logo"));
+  }
+  if (detailedClientLogo instanceof HTMLInputElement) {
+    detailedClientLogo.addEventListener("change", () => updateDetailedLogoState(detailedClientLogo, "client_logo"));
+  }
+}
+
 function bindGenericLiveEvents() {
   form.addEventListener("input", (event) => {
     const target = event.target;
@@ -2190,84 +2329,97 @@ function initStepControls() {
   });
 }
 
+async function exportPreviewAsPdf(printable, fileName, button) {
+  if (typeof window.html2canvas !== "function" || !window.jspdf?.jsPDF) {
+    alert("PDF kütüphanesi yüklenemedi. Sayfayı yenileyip tekrar deneyin.");
+    return;
+  }
+
+  const originalButtonText = button.textContent;
+  button.disabled = true;
+  button.textContent = getCurrentLang() === "en" ? "Preparing PDF..." : "PDF hazırlanıyor...";
+
+  let pdfSandbox = null;
+  try {
+    pdfSandbox = createPdfSandbox(printable);
+    const sourceNode = pdfSandbox.clone;
+    await waitForRenderableAssets(sourceNode);
+    const pageNodes = [...sourceNode.querySelectorAll(".pdf-page")];
+    const pages = pageNodes.length ? pageNodes : [sourceNode];
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+      compress: true
+    });
+
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const margin = 8;
+    const contentWidth = pageWidth - margin * 2;
+    const contentHeight = pageHeight - margin * 2;
+
+    for (let index = 0; index < pages.length; index += 1) {
+      const node = pages[index];
+      const canvas = await window.html2canvas(node, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        backgroundColor: "#ffffff",
+        scrollX: 0,
+        scrollY: 0
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = Math.min(contentWidth / imgWidth, contentHeight / imgHeight);
+      const renderWidth = imgWidth * ratio;
+      const renderHeight = imgHeight * ratio;
+      const offsetX = margin + (contentWidth - renderWidth) / 2;
+      const offsetY = margin + (contentHeight - renderHeight) / 2;
+
+      if (index > 0) pdf.addPage();
+      pdf.addImage(imgData, "PNG", offsetX, offsetY, renderWidth, renderHeight, undefined, "FAST");
+    }
+
+    pdf.save(fileName);
+  } catch (error) {
+    console.error("PDF export failed:", error);
+    alert("PDF oluşturulamadı. Lütfen sayfayı yenileyip tekrar deneyin.");
+  } finally {
+    destroyPdfSandbox(pdfSandbox);
+    button.disabled = false;
+    button.textContent = originalButtonText;
+  }
+}
+
 function initPdfExport() {
   downloadPdfBtn.addEventListener("click", async () => {
     if (!validateDateRange({ showMessage: true })) return;
-
     const printable = previewContainer.querySelector(".report-stack");
     if (!printable) {
       alert(text("preview_first", getCurrentLang()));
       return;
     }
-
-    if (typeof window.html2canvas !== "function" || !window.jspdf?.jsPDF) {
-      alert("PDF kütüphanesi yüklenemedi. Sayfayı yenileyip tekrar deneyin.");
-      return;
-    }
-
     const fileName = `${(form.client_name.value || "rapor").replace(/\s+/g, "_")}_rapor.pdf`;
-
-    const originalButtonText = downloadPdfBtn.textContent;
-    downloadPdfBtn.disabled = true;
-    downloadPdfBtn.textContent = getCurrentLang() === "en" ? "Preparing PDF..." : "PDF hazırlanıyor...";
-
-    let pdfSandbox = null;
-    try {
-      pdfSandbox = createPdfSandbox(printable);
-      const sourceNode = pdfSandbox.clone;
-      await waitForRenderableAssets(sourceNode);
-      const pageNodes = [...sourceNode.querySelectorAll(".pdf-page")];
-      const pages = pageNodes.length ? pageNodes : [sourceNode];
-
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-        compress: true
-      });
-
-      const pageWidth = 210;
-      const pageHeight = 297;
-      const margin = 8;
-      const contentWidth = pageWidth - margin * 2;
-      const contentHeight = pageHeight - margin * 2;
-
-      for (let index = 0; index < pages.length; index += 1) {
-        const node = pages[index];
-        const canvas = await window.html2canvas(node, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: false,
-          logging: false,
-          backgroundColor: "#ffffff",
-          scrollX: 0,
-          scrollY: 0
-        });
-
-        const imgData = canvas.toDataURL("image/png");
-        const imgWidth = canvas.width;
-        const imgHeight = canvas.height;
-        const ratio = Math.min(contentWidth / imgWidth, contentHeight / imgHeight);
-        const renderWidth = imgWidth * ratio;
-        const renderHeight = imgHeight * ratio;
-        const offsetX = margin + (contentWidth - renderWidth) / 2;
-        const offsetY = margin + (contentHeight - renderHeight) / 2;
-
-        if (index > 0) pdf.addPage();
-        pdf.addImage(imgData, "PNG", offsetX, offsetY, renderWidth, renderHeight, undefined, "FAST");
-      }
-
-      pdf.save(fileName);
-    } catch (error) {
-      console.error("PDF export failed:", error);
-      alert("PDF oluşturulamadı. Lütfen sayfayı yenileyip tekrar deneyin.");
-    } finally {
-      destroyPdfSandbox(pdfSandbox);
-      downloadPdfBtn.disabled = false;
-      downloadPdfBtn.textContent = originalButtonText;
-    }
+    await exportPreviewAsPdf(printable, fileName, downloadPdfBtn);
   });
+
+  if (detailedDownloadPdfBtn) {
+    detailedDownloadPdfBtn.addEventListener("click", async () => {
+      const printable = detailedReportPreview?.querySelector(".report-stack");
+      if (!printable) {
+        alert(text("preview_first", getCurrentLang()));
+        return;
+      }
+      const fileName = `${(detailedClientName?.value || "detayli_rapor").replace(/\s+/g, "_")}_rapor.pdf`;
+      await exportPreviewAsPdf(printable, fileName, detailedDownloadPdfBtn);
+    });
+  }
 }
 
 function initLogos() {
@@ -2291,6 +2443,7 @@ function bootstrap() {
   bindThemeEvents();
   initModeTabs();
   initDetailedCsvUploader();
+  initDetailedFormEvents();
   bindGenericLiveEvents();
   initStepControls();
   initPdfExport();
