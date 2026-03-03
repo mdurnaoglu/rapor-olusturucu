@@ -1,5 +1,10 @@
 const REPORT_TYPE_ORDER = ["meta", "google_ads", "linkedin_ads", "social_media", "website", "general_performance", "custom"];
 const AD_REPORT_TYPES = new Set(["meta", "google_ads", "linkedin_ads"]);
+const KPI_NOTE_MAX = 700;
+const KPI_CARDS_PER_SECTION = 4;
+const DETAILED_WIDGETS_PER_SECTION = 8;
+const MAX_IMAGE_FILE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"]);
 
 const TEXT = {
   tr: {
@@ -22,10 +27,26 @@ const TEXT = {
     image_end: "Son",
     select_limit_reached: "Bu rapor tipi için KPI seçim limiti doldu.",
     creative_test: "Kreatif Test Süreci",
+    campaign_test_process: "Kampanya Test Süreci",
     tested_creatives: "Test Edilen Kreatif",
     activated_ads: "Aktif Edilen Reklam",
     paused_ads: "Kapatılan Reklam",
     ongoing_ads: "Aktif Devam Reklam",
+    opened_campaigns: "Açılan Kampanya Sayısı",
+    campaign_types: "Kampanya Türleri",
+    campaign_type_search: "Arama Ağı",
+    campaign_type_display: "Display",
+    campaign_type_pmax: "PMax",
+    campaign_type_phone: "Telefon",
+    campaign_type_dynamic: "Dinamik",
+    active_ads_count: "Aktif Edilen Reklam Sayısı",
+    added_keywords: "Eklenen Anahtar Kelime Sayısı",
+    added_negative_keywords: "Eklenen Negatif Anahtar Kelime Sayısı",
+    social_platform_note: "Platform Genel Notu",
+    social_platform_image: "Platform Görseli",
+    clear_image: "Görseli Temizle",
+    invalid_image_type: "Desteklenmeyen görsel formatı. PNG, JPG, WEBP veya SVG yükleyin.",
+    invalid_image_size: "Görsel boyutu 5 MB sınırını aşıyor.",
     add_custom_kpi: "+ Yeni KPI Ekle",
     custom_kpi_name: "Alan Adı",
     custom_kpi_type: "Alan Türü",
@@ -61,10 +82,26 @@ const TEXT = {
     image_end: "End",
     select_limit_reached: "KPI selection limit reached for this report type.",
     creative_test: "Creative Testing Process",
+    campaign_test_process: "Campaign Testing Process",
     tested_creatives: "Tested Creatives",
     activated_ads: "Activated Ads",
     paused_ads: "Paused Ads",
     ongoing_ads: "Ongoing Ads",
+    opened_campaigns: "Opened Campaigns",
+    campaign_types: "Campaign Types",
+    campaign_type_search: "Search Network",
+    campaign_type_display: "Display",
+    campaign_type_pmax: "PMax",
+    campaign_type_phone: "Phone",
+    campaign_type_dynamic: "Dynamic",
+    active_ads_count: "Activated Ad Count",
+    added_keywords: "Added Keywords",
+    added_negative_keywords: "Added Negative Keywords",
+    social_platform_note: "Platform Note",
+    social_platform_image: "Platform Image",
+    clear_image: "Clear Image",
+    invalid_image_type: "Unsupported image format. Upload PNG, JPG, WEBP or SVG.",
+    invalid_image_size: "Image size exceeds the 5 MB limit.",
     add_custom_kpi: "+ Add New KPI",
     custom_kpi_name: "Field Name",
     custom_kpi_type: "Field Type",
@@ -336,6 +373,14 @@ const SOCIAL_PLATFORM_LABELS = {
   youtube: { tr: "YouTube", en: "YouTube" }
 };
 
+const GOOGLE_CAMPAIGN_TYPES = [
+  { id: "search", labelKey: "campaign_type_search" },
+  { id: "display", labelKey: "campaign_type_display" },
+  { id: "pmax", labelKey: "campaign_type_pmax" },
+  { id: "phone", labelKey: "campaign_type_phone" },
+  { id: "dynamic", labelKey: "campaign_type_dynamic" }
+];
+
 const CURRENCY_SYMBOLS = {
   TRY: "₺",
   USD: "$",
@@ -451,6 +496,7 @@ const colorHexInputMap = new Map(
 const state = {
   currentMode: "quick",
   currentStep: 1,
+  activeTypeTab: "meta",
   selectedReportTypes: new Set(["meta", "google_ads"]),
   selectedSocialPlatforms: new Set(["instagram"]),
   selectedGoals: new Set(["lead"]),
@@ -460,6 +506,7 @@ const state = {
   customKpis: [],
   reportNotesByType: {},
   reportImageByType: {},
+  socialAssetsByPlatform: {},
   creativeByType: {},
   logoState: { agency_logo: "", client_logo: "" },
   detailedCsv: {
@@ -555,7 +602,7 @@ function isRenderableCsvValue(value) {
   return true;
 }
 
-function extractCsvWidgets(rows) {
+function parseCsvWidgetsFromHeader(rows) {
   if (!rows.length) return [];
   const headers = rows[0] || [];
   if (!headers.length) return [];
@@ -563,10 +610,13 @@ function extractCsvWidgets(rows) {
   const dataRows = rows.slice(1).filter((row) => row.some((cell) => isFilledCsvValue(cell)));
   if (!dataRows.length) return [];
 
-  const bestRow = dataRows.reduce((best, row) => {
-    const score = headers.reduce((count, _header, index) => (isFilledCsvValue(row[index]) ? count + 1 : count), 0);
-    return score > best.score ? { row, score } : best;
-  }, { row: dataRows[0], score: 0 }).row;
+  const bestRow = dataRows.reduce(
+    (best, row) => {
+      const score = headers.reduce((count, _header, index) => (isFilledCsvValue(row[index]) ? count + 1 : count), 0);
+      return score > best.score ? { row, score } : best;
+    },
+    { row: dataRows[0], score: 0 }
+  ).row;
 
   const widgets = [];
   headers.forEach((header, index) => {
@@ -575,7 +625,46 @@ function extractCsvWidgets(rows) {
     if (!title || !isRenderableCsvValue(value)) return;
     widgets.push({ title, value });
   });
+
   return widgets;
+}
+
+function parseCsvWidgetsFromPairs(rows) {
+  const widgets = [];
+  const seen = new Set();
+
+  rows.forEach((row) => {
+    const title = String(row?.[0] ?? "").trim();
+    const value = String(row?.[1] ?? "").trim();
+    if (!title || !isRenderableCsvValue(value)) return;
+
+    const normalizedTitle = title.toLowerCase();
+    if (
+      normalizedTitle === "metric" ||
+      normalizedTitle === "metrics" ||
+      normalizedTitle === "ölçüm" ||
+      normalizedTitle === "kpi"
+    ) {
+      return;
+    }
+
+    if (seen.has(normalizedTitle)) return;
+    seen.add(normalizedTitle);
+    widgets.push({ title, value });
+  });
+
+  return widgets;
+}
+
+function extractCsvWidgets(rows) {
+  if (!rows.length) return [];
+  const cleanRows = rows.filter((row) => row.some((cell) => isFilledCsvValue(cell)));
+  if (!cleanRows.length) return [];
+
+  const headerWidgets = parseCsvWidgetsFromHeader(cleanRows);
+  const pairWidgets = parseCsvWidgetsFromPairs(cleanRows);
+
+  return pairWidgets.length > headerWidgets.length ? pairWidgets : headerWidgets;
 }
 
 function getDateRangeErrorMessage() {
@@ -838,6 +927,23 @@ function createCustomKpi() {
   };
 }
 
+function createSocialPlatformAsset() {
+  return { note: "", src: "" };
+}
+
+function getDefaultCreativeState(typeId) {
+  if (typeId === "google_ads") {
+    return {
+      openedCampaigns: "",
+      campaignTypes: [],
+      activatedAds: "",
+      addedKeywords: "",
+      addedNegativeKeywords: ""
+    };
+  }
+  return { tested: "", activated: "", paused: "", active: "" };
+}
+
 function ensureTypeState(typeId) {
   if (!state.selectedKpisByType[typeId]) {
     const defaultItems = getFlattenKpis(typeId).slice(0, 6).map((item) => item.id);
@@ -857,7 +963,15 @@ function ensureTypeState(typeId) {
   }
 
   if (AD_REPORT_TYPES.has(typeId) && !state.creativeByType[typeId]) {
-    state.creativeByType[typeId] = { tested: "", activated: "", paused: "", active: "" };
+    state.creativeByType[typeId] = getDefaultCreativeState(typeId);
+  }
+
+  if (typeId === "social_media") {
+    [...state.selectedSocialPlatforms].forEach((platformId) => {
+      if (!state.socialAssetsByPlatform[platformId]) {
+        state.socialAssetsByPlatform[platformId] = createSocialPlatformAsset();
+      }
+    });
   }
 
   if (typeId === "custom" && state.customKpis.length === 0) {
@@ -889,6 +1003,11 @@ function syncStateFromStep1() {
   state.selectedGoals = new Set(readSelectedCheckboxValues("report_goals"));
 
   [...state.selectedReportTypes].forEach((typeId) => ensureTypeState(typeId));
+
+  const activeSelected = REPORT_TYPE_ORDER.filter((typeId) => state.selectedReportTypes.has(typeId));
+  if (!activeSelected.includes(state.activeTypeTab)) {
+    state.activeTypeTab = activeSelected[0] || "meta";
+  }
 }
 
 function renderCustomModuleChips() {
@@ -989,7 +1108,6 @@ function updateStepUI() {
 
   prevBtn.style.display = state.currentStep === 1 ? "none" : "inline-flex";
   nextBtn.style.display = state.currentStep === 3 ? "none" : "inline-flex";
-  previewBtn.style.display = state.currentStep === 3 ? "inline-flex" : "none";
 }
 
 function buildMetricSelectionHtml(typeId, lang) {
@@ -1059,17 +1177,39 @@ function buildSelectedKpiInputsHtml(typeId, lang) {
                 <div class="kpi-input-row-grid">
                   <input type="text" data-kpi-current="${typeId}" data-kpi-id="${metricKey}" value="${escapeHtml(metricState.current)}" placeholder="${text("current_period", lang)}" />
                   <input type="text" data-kpi-previous="${typeId}" data-kpi-id="${metricKey}" value="${escapeHtml(metricState.previous)}" placeholder="${text("previous_optional", lang)}" />
-                  <input type="text" data-kpi-note="${typeId}" data-kpi-id="${metricKey}" value="${escapeHtml(metricState.note)}" placeholder="${text("kpi_note", lang)}" />
+                  <input type="text" data-kpi-note="${typeId}" data-kpi-id="${metricKey}" value="${escapeHtml(metricState.note)}" placeholder="${text("kpi_note", lang)}" maxlength="${KPI_NOTE_MAX}" />
                 </div>
               </div>
             `;
           })
           .join("");
 
+        const platformAssetState = state.socialAssetsByPlatform[platformId] || createSocialPlatformAsset();
+        state.socialAssetsByPlatform[platformId] = platformAssetState;
+        const platformImagePreview = platformAssetState.src
+          ? `
+            <div class="asset-preview">
+              <img src="${platformAssetState.src}" alt="${escapeHtml(platformLabel)}" />
+              <button type="button" data-clear-platform-image="${platformId}">${text("clear_image", lang)}</button>
+            </div>
+          `
+          : "";
+
         return `
           <section class="platform-kpi-block">
             <h4>${escapeHtml(platformLabel)}</h4>
             <div class="platform-kpi-rows">${rows}</div>
+            <div class="asset-grid platform-asset-grid">
+              <label>
+                <span class="field-label">${text("social_platform_image", lang)}</span>
+                <input type="file" accept="image/*" data-platform-image="${platformId}" />
+              </label>
+              <label class="full-width">
+                <span class="field-label">${text("social_platform_note", lang)}</span>
+                <textarea data-platform-note="${platformId}" placeholder="${text("social_platform_note", lang)}" maxlength="${KPI_NOTE_MAX}">${escapeHtml(platformAssetState.note || "")}</textarea>
+              </label>
+              ${platformImagePreview}
+            </div>
           </section>
         `;
       })
@@ -1088,7 +1228,7 @@ function buildSelectedKpiInputsHtml(typeId, lang) {
           <div class="kpi-input-row-grid">
             <input type="text" data-kpi-current="${typeId}" data-kpi-id="${item.id}" value="${escapeHtml(metricState.current)}" placeholder="${text("current_period", lang)}" />
             <input type="text" data-kpi-previous="${typeId}" data-kpi-id="${item.id}" value="${escapeHtml(metricState.previous)}" placeholder="${text("previous_optional", lang)}" />
-            <input type="text" data-kpi-note="${typeId}" data-kpi-id="${item.id}" value="${escapeHtml(metricState.note)}" placeholder="${text("kpi_note", lang)}" />
+            <input type="text" data-kpi-note="${typeId}" data-kpi-id="${item.id}" value="${escapeHtml(metricState.note)}" placeholder="${text("kpi_note", lang)}" maxlength="${KPI_NOTE_MAX}" />
           </div>
         </div>
       `;
@@ -1096,9 +1236,58 @@ function buildSelectedKpiInputsHtml(typeId, lang) {
     .join("");
 }
 
+function campaignTypeLabel(campaignTypeId, lang) {
+  const option = GOOGLE_CAMPAIGN_TYPES.find((item) => item.id === campaignTypeId);
+  if (!option) return campaignTypeId;
+  return text(option.labelKey, lang);
+}
+
 function buildCreativeTestHtml(typeId, lang) {
   if (!AD_REPORT_TYPES.has(typeId)) return "";
-  const creative = state.creativeByType[typeId] || { tested: "", activated: "", paused: "", active: "" };
+  const creative = state.creativeByType[typeId] || getDefaultCreativeState(typeId);
+
+  if (typeId === "google_ads") {
+    const campaignTypes = new Set(Array.isArray(creative.campaignTypes) ? creative.campaignTypes : []);
+    const campaignTypeOptions = GOOGLE_CAMPAIGN_TYPES
+      .map((option) => {
+        const checked = campaignTypes.has(option.id) ? "checked" : "";
+        return `
+          <label class="chip-check">
+            <input type="checkbox" data-campaign-type="${typeId}" value="${option.id}" ${checked} />
+            <span>${escapeHtml(text(option.labelKey, lang))}</span>
+          </label>
+        `;
+      })
+      .join("");
+
+    return `
+      <div class="creative-block">
+        <h4>${text("campaign_test_process", lang)}</h4>
+        <div class="grid two compact-grid">
+          <label>
+            <span class="field-label">${text("opened_campaigns", lang)}</span>
+            <input type="text" data-creative="${typeId}" data-creative-key="openedCampaigns" value="${escapeHtml(creative.openedCampaigns)}" />
+          </label>
+          <label>
+            <span class="field-label">${text("active_ads_count", lang)}</span>
+            <input type="text" data-creative="${typeId}" data-creative-key="activatedAds" value="${escapeHtml(creative.activatedAds)}" />
+          </label>
+          <label>
+            <span class="field-label">${text("added_keywords", lang)}</span>
+            <input type="text" data-creative="${typeId}" data-creative-key="addedKeywords" value="${escapeHtml(creative.addedKeywords)}" />
+          </label>
+          <label>
+            <span class="field-label">${text("added_negative_keywords", lang)}</span>
+            <input type="text" data-creative="${typeId}" data-creative-key="addedNegativeKeywords" value="${escapeHtml(creative.addedNegativeKeywords)}" />
+          </label>
+          <div class="full-width">
+            <span class="field-label">${text("campaign_types", lang)}</span>
+            <div class="chip-check-grid campaign-type-grid">${campaignTypeOptions}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
 
   return `
     <div class="creative-block">
@@ -1132,7 +1321,7 @@ function buildReportAssetHtml(typeId, lang) {
     ? `
       <div class="asset-preview">
         <img src="${imageState.src}" alt="report-image" />
-        <button type="button" data-clear-type-image="${typeId}">Görseli Temizle</button>
+        <button type="button" data-clear-type-image="${typeId}">${text("clear_image", lang)}</button>
       </div>
     `
     : "";
@@ -1174,7 +1363,7 @@ function buildCustomReportHtml(lang) {
         </select>
         <input type="text" data-custom-current="${item.id}" value="${escapeHtml(item.current)}" placeholder="${text("current_period", lang)}" />
         <input type="text" data-custom-previous="${item.id}" value="${escapeHtml(item.previous)}" placeholder="${text("previous_optional", lang)}" />
-        <input type="text" data-custom-note="${item.id}" value="${escapeHtml(item.note)}" placeholder="${text("kpi_note", lang)}" />
+        <input type="text" data-custom-note="${item.id}" value="${escapeHtml(item.note)}" placeholder="${text("kpi_note", lang)}" maxlength="${KPI_NOTE_MAX}" />
         <button type="button" data-remove-custom-kpi="${item.id}">×</button>
       </div>
     `
@@ -1202,62 +1391,83 @@ function renderDynamicFields() {
     return;
   }
 
-  const html = selectedTypes
-    .map((typeId) => {
-      ensureTypeState(typeId);
-      const config = REPORT_CONFIG[typeId];
-      const typeTitle = typeId === "custom"
-        ? getDisplayTypeLabel("custom", lang, state.customModules)
-        : config?.label?.[lang] || config?.label?.tr || typeId;
+  selectedTypes.forEach((typeId) => ensureTypeState(typeId));
 
-      const typeSpecific =
-        typeId === "custom"
-          ? buildCustomReportHtml(lang)
-          : `
-            <div class="kpi-builder-block">
-              ${buildMetricSelectionHtml(typeId, lang)}
-              <div class="kpi-input-list">
-                ${buildSelectedKpiInputsHtml(typeId, lang)}
-              </div>
-            </div>
-          `;
+  const activeTypeId = selectedTypes.includes(state.activeTypeTab) ? state.activeTypeTab : selectedTypes[0];
+  state.activeTypeTab = activeTypeId;
+  const activeConfig = REPORT_CONFIG[activeTypeId];
+  const typeTitle = activeTypeId === "custom"
+    ? getDisplayTypeLabel("custom", lang, state.customModules)
+    : activeConfig?.label?.[lang] || activeConfig?.label?.tr || activeTypeId;
 
-      const socialInfo =
-        typeId === "social_media" && state.selectedSocialPlatforms.size
-          ? `
-            <div class="inline-pills">
-              <strong>${text("social_platforms", lang)}:</strong>
-              ${[...state.selectedSocialPlatforms]
-                .map((platformId) => `<span>${escapeHtml(SOCIAL_PLATFORM_LABELS[platformId]?.[lang] || platformId)}</span>`)
-                .join("")}
-            </div>
-          `
-          : "";
+  const typeTabs = selectedTypes.length > 1
+    ? `
+      <div class="kpi-type-tabs">
+        ${selectedTypes
+          .map((typeId) => {
+            const isActive = typeId === activeTypeId;
+            const label = getDisplayTypeLabel(typeId, lang, state.customModules);
+            return `<button type="button" class="kpi-type-tab ${isActive ? "active" : ""}" data-type-tab="${typeId}">${escapeHtml(label)}</button>`;
+          })
+          .join("")}
+      </div>
+    `
+    : "";
 
-      const customInfo =
-        typeId === "custom"
-          ? `
-            <div class="inline-pills">
-              <strong>${text("custom_modules", lang)}:</strong>
-              ${state.customModules.length ? state.customModules.map((module) => `<span>${escapeHtml(module)}</span>`).join("") : `<span>${text("no_custom_modules", lang)}</span>`}
-            </div>
-          `
-          : "";
-
-      return `
-        <fieldset class="dynamic-group" data-type-group="${typeId}">
-          <legend>${escapeHtml(typeTitle)}</legend>
-          ${socialInfo}
-          ${customInfo}
-          ${typeSpecific}
-          ${buildCreativeTestHtml(typeId, lang)}
-          ${buildReportAssetHtml(typeId, lang)}
-        </fieldset>
+  const typeSpecific =
+    activeTypeId === "custom"
+      ? buildCustomReportHtml(lang)
+      : `
+        <div class="kpi-builder-block">
+          ${buildMetricSelectionHtml(activeTypeId, lang)}
+          <div class="kpi-input-list">
+            ${buildSelectedKpiInputsHtml(activeTypeId, lang)}
+          </div>
+        </div>
       `;
-    })
-    .join("");
 
-  dynamicFields.innerHTML = html;
+  const socialInfo =
+    activeTypeId === "social_media" && state.selectedSocialPlatforms.size
+      ? `
+        <div class="inline-pills">
+          <strong>${text("social_platforms", lang)}:</strong>
+          ${[...state.selectedSocialPlatforms]
+            .map((platformId) => `<span>${escapeHtml(SOCIAL_PLATFORM_LABELS[platformId]?.[lang] || platformId)}</span>`)
+            .join("")}
+        </div>
+      `
+      : "";
+
+  const customInfo =
+    activeTypeId === "custom"
+      ? `
+        <div class="inline-pills">
+          <strong>${text("custom_modules", lang)}:</strong>
+          ${state.customModules.length ? state.customModules.map((module) => `<span>${escapeHtml(module)}</span>`).join("") : `<span>${text("no_custom_modules", lang)}</span>`}
+        </div>
+      `
+      : "";
+
+  dynamicFields.innerHTML = `
+    ${typeTabs}
+    <fieldset class="dynamic-group" data-type-group="${activeTypeId}">
+      <legend>${escapeHtml(typeTitle)}</legend>
+      ${socialInfo}
+      ${customInfo}
+      ${typeSpecific}
+      ${buildCreativeTestHtml(activeTypeId, lang)}
+      ${buildReportAssetHtml(activeTypeId, lang)}
+    </fieldset>
+  `;
+
+  dynamicFields.querySelectorAll("[data-type-tab]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const nextTypeId = button.getAttribute("data-type-tab");
+      if (!nextTypeId || nextTypeId === state.activeTypeTab) return;
+      state.activeTypeTab = nextTypeId;
+      renderDynamicFields();
+    });
+  });
 
   dynamicFields.querySelectorAll("[data-kpi-toggle]").forEach((input) => {
     input.addEventListener("change", () => {
@@ -1350,6 +1560,10 @@ function renderDynamicFields() {
         scheduleLivePreview();
         return;
       }
+      if (!isValidImageFile(file)) {
+        fileInput.value = "";
+        return;
+      }
       state.reportImageByType[typeId].src = await readFileAsDataUrl(file);
       renderDynamicFields();
       scheduleLivePreview();
@@ -1366,13 +1580,76 @@ function renderDynamicFields() {
     });
   });
 
+  dynamicFields.querySelectorAll("[data-platform-note]").forEach((textarea) => {
+    textarea.addEventListener("input", () => {
+      const platformId = textarea.getAttribute("data-platform-note");
+      if (!platformId) return;
+      if (!state.socialAssetsByPlatform[platformId]) {
+        state.socialAssetsByPlatform[platformId] = createSocialPlatformAsset();
+      }
+      state.socialAssetsByPlatform[platformId].note = textarea.value.slice(0, KPI_NOTE_MAX);
+      scheduleLivePreview();
+    });
+  });
+
+  dynamicFields.querySelectorAll("[data-platform-image]").forEach((fileInput) => {
+    fileInput.addEventListener("change", async () => {
+      const platformId = fileInput.getAttribute("data-platform-image");
+      if (!platformId) return;
+      if (!state.socialAssetsByPlatform[platformId]) {
+        state.socialAssetsByPlatform[platformId] = createSocialPlatformAsset();
+      }
+      const file = fileInput.files?.[0];
+      if (!file) {
+        state.socialAssetsByPlatform[platformId].src = "";
+        renderDynamicFields();
+        scheduleLivePreview();
+        return;
+      }
+      if (!isValidImageFile(file)) {
+        fileInput.value = "";
+        return;
+      }
+      state.socialAssetsByPlatform[platformId].src = await readFileAsDataUrl(file);
+      renderDynamicFields();
+      scheduleLivePreview();
+    });
+  });
+
+  dynamicFields.querySelectorAll("[data-clear-platform-image]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const platformId = button.getAttribute("data-clear-platform-image");
+      if (!platformId || !state.socialAssetsByPlatform[platformId]) return;
+      state.socialAssetsByPlatform[platformId].src = "";
+      renderDynamicFields();
+      scheduleLivePreview();
+    });
+  });
+
   dynamicFields.querySelectorAll("[data-creative]").forEach((input) => {
     input.addEventListener("input", () => {
       const typeId = input.getAttribute("data-creative");
       const key = input.getAttribute("data-creative-key");
       if (!typeId || !key) return;
-      if (!state.creativeByType[typeId]) state.creativeByType[typeId] = { tested: "", activated: "", paused: "", active: "" };
+      if (!state.creativeByType[typeId]) state.creativeByType[typeId] = getDefaultCreativeState(typeId);
       state.creativeByType[typeId][key] = input.value;
+      scheduleLivePreview();
+    });
+  });
+
+  dynamicFields.querySelectorAll("[data-campaign-type]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const typeId = input.getAttribute("data-campaign-type");
+      const campaignTypeId = input.value;
+      if (!typeId || !campaignTypeId) return;
+      if (!state.creativeByType[typeId]) state.creativeByType[typeId] = getDefaultCreativeState(typeId);
+      const selectedTypesSet = new Set(state.creativeByType[typeId].campaignTypes || []);
+      if (input.checked) {
+        selectedTypesSet.add(campaignTypeId);
+      } else {
+        selectedTypesSet.delete(campaignTypeId);
+      }
+      state.creativeByType[typeId].campaignTypes = [...selectedTypesSet];
       scheduleLivePreview();
     });
   });
@@ -1521,6 +1798,7 @@ function getDataSnapshot() {
     customKpis: JSON.parse(JSON.stringify(state.customKpis)),
     reportNotesByType: JSON.parse(JSON.stringify(state.reportNotesByType)),
     reportImageByType: JSON.parse(JSON.stringify(state.reportImageByType)),
+    socialAssetsByPlatform: JSON.parse(JSON.stringify(state.socialAssetsByPlatform)),
     creativeByType: JSON.parse(JSON.stringify(state.creativeByType)),
     agency_logo: state.logoState.agency_logo,
     client_logo: state.logoState.client_logo
@@ -1749,7 +2027,34 @@ function renderMetricCards(typeId, data, lang) {
 
 function renderCreativeSummary(typeId, data, lang) {
   if (!AD_REPORT_TYPES.has(typeId)) return "";
-  const creative = data.creativeByType[typeId] || {};
+  const creative = data.creativeByType[typeId] || getDefaultCreativeState(typeId);
+
+  if (typeId === "google_ads") {
+    const campaignTypes = (creative.campaignTypes || []).map((campaignTypeId) => campaignTypeLabel(campaignTypeId, lang)).join(" • ");
+    const hasAnyValue = [
+      creative.openedCampaigns,
+      campaignTypes,
+      creative.activatedAds,
+      creative.addedKeywords,
+      creative.addedNegativeKeywords
+    ].some((value) => String(value || "").trim());
+
+    if (!hasAnyValue) return "";
+
+    return `
+      <div class="creative-summary">
+        <h4>${text("campaign_test_process", lang)}</h4>
+        <div class="metric-grid compact">
+          <article class="metric-card compact"><span class="metric-label">${text("opened_campaigns", lang)}</span><strong>${escapeHtml(creative.openedCampaigns || "-")}</strong></article>
+          <article class="metric-card compact"><span class="metric-label">${text("campaign_types", lang)}</span><strong>${escapeHtml(campaignTypes || "-")}</strong></article>
+          <article class="metric-card compact"><span class="metric-label">${text("active_ads_count", lang)}</span><strong>${escapeHtml(creative.activatedAds || "-")}</strong></article>
+          <article class="metric-card compact"><span class="metric-label">${text("added_keywords", lang)}</span><strong>${escapeHtml(creative.addedKeywords || "-")}</strong></article>
+          <article class="metric-card compact"><span class="metric-label">${text("added_negative_keywords", lang)}</span><strong>${escapeHtml(creative.addedNegativeKeywords || "-")}</strong></article>
+        </div>
+      </div>
+    `;
+  }
+
   const values = [creative.tested, creative.activated, creative.paused, creative.active].filter((value) => String(value || "").trim());
   if (!values.length) return "";
 
@@ -1831,6 +2136,195 @@ function chunkArray(items, chunkSize) {
   return chunks;
 }
 
+function buildTypeMetricEntries(typeId, data, lang, platformId = null) {
+  if (typeId === "custom") {
+    return (data.customKpis || [])
+      .filter((row) => String(row.name || "").trim())
+      .map((row) => {
+        const current = formatMetricValue(row.kind, row.current, data.currency, lang);
+        const previous = formatMetricValue(row.kind, row.previous, data.currency, lang);
+        return {
+          label: row.name,
+          current,
+          previous,
+          delta: formatDelta(row.current, row.previous, lang),
+          note: row.note
+        };
+      });
+  }
+
+  if (typeId === "social_media") {
+    const selectedIds = data.selectedKpisByType[typeId] || [];
+    const metrics = getFlattenKpis(typeId).filter((item) => selectedIds.includes(item.id));
+    if (!metrics.length) return [];
+    const platforms = platformId ? [platformId] : data.selectedSocialPlatforms || [];
+
+    return platforms.flatMap((selectedPlatformId) =>
+      metrics.map((metric) => {
+        const rowState = getSocialMetricState(typeId, selectedPlatformId, metric.id, data.kpiValuesByType);
+        let currentRaw = rowState.current;
+        if (metric.id === "followers_growth") {
+          const startState = getSocialMetricState(typeId, selectedPlatformId, "followers_start", data.kpiValuesByType);
+          const endState = getSocialMetricState(typeId, selectedPlatformId, "followers_end", data.kpiValuesByType);
+          const start = parseLooseNumber(startState.current);
+          const end = parseLooseNumber(endState.current);
+          if (Number.isFinite(start) && Number.isFinite(end)) currentRaw = String(end - start);
+        }
+
+        return {
+          label: metricLabel(metric, lang),
+          current: formatMetricValue(metric.kind, currentRaw, data.currency, lang),
+          previous: formatMetricValue(metric.kind, rowState.previous, data.currency, lang),
+          delta: formatDelta(currentRaw, rowState.previous, lang),
+          note: rowState.note
+        };
+      })
+    );
+  }
+
+  const selectedIds = data.selectedKpisByType[typeId] || [];
+  return selectedIds
+    .map((metricId) => getMetricById(typeId, metricId))
+    .filter(Boolean)
+    .map((metric) => {
+      const rowState = data.kpiValuesByType[typeId]?.[metric.id] || { current: "", previous: "", note: "" };
+      return {
+        label: metricLabel(metric, lang),
+        current: formatMetricValue(metric.kind, rowState.current, data.currency, lang),
+        previous: formatMetricValue(metric.kind, rowState.previous, data.currency, lang),
+        delta: formatDelta(rowState.current, rowState.previous, lang),
+        note: rowState.note
+      };
+    });
+}
+
+function renderMetricGrid(entries, lang, { compact = false } = {}) {
+  if (!entries.length) return `<p class="empty-placeholder">${text("no_kpi_selected", lang)}</p>`;
+  const gridClass = compact ? "metric-grid metric-grid-four" : "metric-grid";
+  return `
+    <div class="${gridClass}">
+      ${entries.map((entry) => buildMetricCardMarkup(entry, lang, { compact })).join("")}
+    </div>
+  `;
+}
+
+function buildQuickSectionDescriptors(reportTypes, data, lang) {
+  const descriptors = [];
+
+  reportTypes.forEach((typeId) => {
+    if (typeId === "social_media") {
+      const platforms = data.selectedSocialPlatforms || [];
+      if (!platforms.length) {
+        descriptors.push({
+          typeId,
+          platformId: null,
+          platformLabel: "",
+          entries: [],
+          part: 1,
+          total: 1,
+          includeTypeAssets: true,
+          includePlatformAssets: false
+        });
+        return;
+      }
+
+      const baseIndex = descriptors.length;
+      platforms.forEach((platformId) => {
+        const platformLabel = SOCIAL_PLATFORM_LABELS[platformId]?.[lang] || platformId;
+        const entries = buildTypeMetricEntries(typeId, data, lang, platformId);
+        const chunks = entries.length ? chunkArray(entries, KPI_CARDS_PER_SECTION) : [[]];
+
+        chunks.forEach((chunk, index) => {
+          descriptors.push({
+            typeId,
+            platformId,
+            platformLabel,
+            entries: chunk,
+            part: index + 1,
+            total: chunks.length,
+            includeTypeAssets: false,
+            includePlatformAssets: index === chunks.length - 1
+          });
+        });
+      });
+
+      if (descriptors.length > baseIndex) {
+        descriptors[descriptors.length - 1].includeTypeAssets = true;
+      }
+      return;
+    }
+
+    const entries = buildTypeMetricEntries(typeId, data, lang);
+    const chunks = entries.length ? chunkArray(entries, KPI_CARDS_PER_SECTION) : [[]];
+    chunks.forEach((chunk, index) => {
+      descriptors.push({
+        typeId,
+        platformId: null,
+        platformLabel: "",
+        entries: chunk,
+        part: index + 1,
+        total: chunks.length,
+        includeTypeAssets: index === chunks.length - 1,
+        includePlatformAssets: false
+      });
+    });
+  });
+
+  return descriptors;
+}
+
+function renderQuickTypeSection(descriptor, data, lang) {
+  const typeLabel = getDisplayTypeLabel(descriptor.typeId, lang, data.customModules || []);
+  const title = descriptor.platformId
+    ? `${typeLabel} • ${descriptor.platformLabel}`
+    : typeLabel;
+  const chunkTitle = descriptor.total > 1 ? `${title} (${descriptor.part}/${descriptor.total})` : title;
+
+  const imageState = data.reportImageByType[descriptor.typeId] || { position: "start", src: "" };
+  const sectionImage = imageState.src
+    ? `<figure class="section-image compact"><img src="${imageState.src}" alt="${escapeHtml(chunkTitle)}" /></figure>`
+    : "";
+
+  const typeNoteHtml =
+    descriptor.includeTypeAssets && data.reportNotesByType[descriptor.typeId]
+      ? `<div class="general-note compact"><h4>${text("general_note", lang)}</h4><p>${escapeHtml(data.reportNotesByType[descriptor.typeId])}</p></div>`
+      : "";
+
+  const socialAssetState = descriptor.platformId ? data.socialAssetsByPlatform?.[descriptor.platformId] : null;
+  const socialPlatformNoteHtml =
+    descriptor.includePlatformAssets && socialAssetState?.note
+      ? `<div class="general-note compact"><h4>${text("social_platform_note", lang)}</h4><p>${escapeHtml(socialAssetState.note)}</p></div>`
+      : "";
+  const socialPlatformImageHtml =
+    descriptor.includePlatformAssets && socialAssetState?.src
+      ? `<figure class="section-image compact"><img src="${socialAssetState.src}" alt="${escapeHtml(descriptor.platformLabel || typeLabel)}" /></figure>`
+      : "";
+
+  const creativeHtml = descriptor.includeTypeAssets ? renderCreativeSummary(descriptor.typeId, data, lang) : "";
+
+  const contentParts = [];
+  if (descriptor.includeTypeAssets && imageState.position === "start") contentParts.push(sectionImage);
+  contentParts.push(renderMetricGrid(descriptor.entries, lang, { compact: true }));
+  if (descriptor.includeTypeAssets && imageState.position === "middle") contentParts.push(sectionImage);
+  contentParts.push(creativeHtml);
+  contentParts.push(typeNoteHtml);
+  contentParts.push(socialPlatformNoteHtml);
+  contentParts.push(socialPlatformImageHtml);
+  if (descriptor.includeTypeAssets && imageState.position === "end") contentParts.push(sectionImage);
+
+  return `
+    <section class="type-page-block compact-type-section">
+      <header class="page-head">
+        <h2>${escapeHtml(chunkTitle)}</h2>
+        <p>${escapeHtml(data.client_name || "-")} • ${escapeHtml(data.report_period || "-")}</p>
+      </header>
+      <div class="content">
+        ${contentParts.filter(Boolean).join("")}
+      </div>
+    </section>
+  `;
+}
+
 function renderPreview(data) {
   const lang = data.report_language === "en" ? "en" : "tr";
   const theme = getThemeTokens(data);
@@ -1861,7 +2355,7 @@ function renderPreview(data) {
   const coverBackground = buildCoverBackground(theme);
 
   const coverPage = `
-    <article class="pdf-page" style="--page-bg:${theme.pageBg};--page-text:${theme.textColor};--card-bg:${theme.cardBg};--card-line:${theme.cardBorder};--muted:${theme.muted};--accent:${theme.accentColor};">
+    <article class="pdf-page cover-page" style="--page-bg:${theme.pageBg};--page-text:${theme.textColor};--card-bg:${theme.cardBg};--card-line:${theme.cardBorder};--muted:${theme.muted};--accent:${theme.accentColor};">
       <div class="pdf-page-inner">
         <section class="cover" style="background:${coverBackground};color:${theme.headingColor};--cover-h1:${theme.h1}px;--cover-h2:${theme.h2}px;">
           <div class="cover-brand-row">
@@ -1888,12 +2382,13 @@ function renderPreview(data) {
     </article>
   `;
 
+  const sectionDescriptors = buildQuickSectionDescriptors(reportTypes, data, lang);
   const pages = reportTypes.length
-    ? chunkArray(reportTypes, 2)
-        .map((typePair) => {
-          const sections = typePair.map((typeId) => renderTypeSection(typeId, data, lang, { compact: true, maxCards: 4 })).join("");
+    ? chunkArray(sectionDescriptors, 2)
+        .map((sectionPair) => {
+          const sections = sectionPair.map((descriptor) => renderQuickTypeSection(descriptor, data, lang)).join("");
           return `
-            <article class="pdf-page ${typePair.length === 2 ? "pair-page" : "single-page"}" style="--page-bg:${theme.pageBg};--page-text:${theme.textColor};--card-bg:${theme.cardBg};--card-line:${theme.cardBorder};--muted:${theme.muted};--accent:${theme.accentColor};">
+            <article class="pdf-page ${sectionPair.length === 2 ? "pair-page" : "single-page"}" style="--page-bg:${theme.pageBg};--page-text:${theme.textColor};--card-bg:${theme.cardBg};--card-line:${theme.cardBorder};--muted:${theme.muted};--accent:${theme.accentColor};">
               <div class="pdf-page-inner">
                 ${sections}
               </div>
@@ -1970,8 +2465,18 @@ function renderDetailedPreview() {
     { id: "google", label: "Google Ads", widgets: state.detailedCsv.google.widgets, fileName: state.detailedCsv.google.fileName }
   ].filter((section) => section.widgets.length);
 
+  const sectionDescriptors = sections.flatMap((section) => {
+    const chunks = section.widgets.length ? chunkArray(section.widgets, DETAILED_WIDGETS_PER_SECTION) : [[]];
+    return chunks.map((chunk, index) => ({
+      ...section,
+      widgets: chunk,
+      part: index + 1,
+      total: chunks.length
+    }));
+  });
+
   const coverPage = `
-    <article class="pdf-page" style="--page-bg:${theme.pageBg};--page-text:${theme.textColor};--card-bg:${theme.cardBg};--card-line:${theme.cardBorder};--muted:${theme.muted};--accent:${theme.accentColor};">
+    <article class="pdf-page cover-page" style="--page-bg:${theme.pageBg};--page-text:${theme.textColor};--card-bg:${theme.cardBg};--card-line:${theme.cardBorder};--muted:${theme.muted};--accent:${theme.accentColor};">
       <div class="pdf-page-inner">
         <section class="cover" style="background:${coverBackground};color:${theme.headingColor};--cover-h1:${theme.h1}px;--cover-h2:${theme.h2}px;">
           <div class="cover-brand-row">
@@ -1992,15 +2497,15 @@ function renderDetailedPreview() {
     </article>
   `;
 
-  const pages = sections.length
-    ? chunkArray(sections, 2)
+  const pages = sectionDescriptors.length
+    ? chunkArray(sectionDescriptors, 2)
         .map((pair) => {
           const blocks = pair
             .map(
               (section) => `
-                <section class="type-page-block compact-type-section">
+                <section class="type-page-block detailed-type-section">
                   <header class="page-head">
-                    <h2>${escapeHtml(section.label)}</h2>
+                    <h2>${escapeHtml(section.total > 1 ? `${section.label} (${section.part}/${section.total})` : section.label)}</h2>
                     <p>${escapeHtml(section.fileName || "CSV Yüklendi")}</p>
                   </header>
                   <div class="content">
@@ -2050,6 +2555,19 @@ async function readFileAsDataUrl(file) {
   });
 }
 
+function isValidImageFile(file) {
+  if (!file) return false;
+  if (!ALLOWED_IMAGE_MIME_TYPES.has(file.type)) {
+    alert(text("invalid_image_type", getCurrentLang()));
+    return false;
+  }
+  if (file.size > MAX_IMAGE_FILE_SIZE) {
+    alert(text("invalid_image_size", getCurrentLang()));
+    return false;
+  }
+  return true;
+}
+
 async function readFileAsText(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -2067,7 +2585,12 @@ async function updateLogoState(event) {
     return;
   }
 
-  state.logoState[input.name] = await readFileAsDataUrl(input.files[0]);
+  const file = input.files[0];
+  if (!isValidImageFile(file)) {
+    input.value = "";
+    return;
+  }
+  state.logoState[input.name] = await readFileAsDataUrl(file);
   scheduleLivePreview();
 }
 
@@ -2079,7 +2602,12 @@ async function updateDetailedLogoState(input, key) {
     return;
   }
 
-  state.detailedLogoState[key] = await readFileAsDataUrl(input.files[0]);
+  const file = input.files[0];
+  if (!isValidImageFile(file)) {
+    input.value = "";
+    return;
+  }
+  state.detailedLogoState[key] = await readFileAsDataUrl(file);
   renderDetailedPreview();
 }
 
@@ -2323,10 +2851,12 @@ function initStepControls() {
     }
   });
 
-  previewBtn.addEventListener("click", () => {
-    if (!validateDateRange({ showMessage: true })) return;
-    renderLivePreview();
-  });
+  if (previewBtn) {
+    previewBtn.addEventListener("click", () => {
+      if (!validateDateRange({ showMessage: true })) return;
+      renderLivePreview();
+    });
+  }
 }
 
 async function exportPreviewAsPdf(printable, fileName, button) {
