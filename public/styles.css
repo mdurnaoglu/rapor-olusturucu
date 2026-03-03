@@ -1010,24 +1010,20 @@ textarea {
   min-height: 100%;
 }
 
-.cover-page .pdf-page-inner {
-  height: 100%;
-}
-
 .cover-page .cover {
-  min-height: 100%;
-  height: 100%;
-  justify-content: space-between;
+  min-height: 310px;
+  height: auto;
+  justify-content: flex-start;
 }
 
 .cover {
   min-height: 310px;
   position: relative;
   overflow: hidden;
-  padding: 18px 22px 24px;
+  padding: 14px 20px 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .cover::after {
@@ -1050,8 +1046,8 @@ textarea {
 }
 
 .logo-box {
-  width: 184px;
-  height: 66px;
+  width: 170px;
+  height: 56px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.35);
   background: rgba(255, 255, 255, 0.16);
@@ -1072,17 +1068,19 @@ textarea {
 }
 
 .cover-top-tags {
-  position: relative;
+  position: absolute;
+  top: 78px;
+  right: 20px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   z-index: 3;
 }
 
 .cover-top-tags span {
-  font-size: 11px;
-  padding: 4px 8px;
+  font-size: 10px;
+  padding: 3px 7px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.32);
@@ -1100,10 +1098,10 @@ textarea {
 .cover-content {
   position: relative;
   z-index: 2;
-  margin-top: 2px;
+  margin-top: 0;
   max-width: 100%;
   display: grid;
-  gap: 6px;
+  gap: 5px;
 }
 
 .eyebrow {
